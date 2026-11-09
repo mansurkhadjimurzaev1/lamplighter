@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 // Пост-обработка: свечение огня (bloom) → тон-маппинг →
@@ -26,7 +25,10 @@ const GradeShader = {
     varying vec2 vUv;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
+      // тон-маппинг и перевод в sRGB прямо здесь — на один полноэкранный проход меньше
       vec3 c = texture2D(tDiffuse, vUv).rgb;
+      c = ACESFilmicToneMapping(c);
+      c = sRGBTransferOETF(vec4(c, 1.0)).rgb;
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
       // тени уходят в глубокий синий/фиолетовый, светлое — в тёплый янтарь
       vec3 shadowTint = vec3(0.045, 0.05, 0.13);
@@ -60,7 +62,6 @@ export class Post {
       this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.85, 0.65, 0.9);
       this.composer.addPass(this.bloom);
     }
-    this.composer.addPass(new OutputPass());
     this.grade = new ShaderPass(GradeShader);
     this.composer.addPass(this.grade);
     this.resize(renderer);

@@ -13,9 +13,11 @@ import { Fireflies, LanternDust } from './fx/particles';
 import { Soundscape } from './audio/soundscape';
 import { FpsMeter } from './ui/fps';
 import { showTitle } from './ui/titleScreen';
+import { AdaptiveResolution } from './core/adaptiveResolution';
 
 // ── Рендерер и сцена ────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ antialias: quality.level !== 'low', powerPreference: 'high-performance' });
+// MSAA не нужен: картинка всё равно идёт через пост-обработку
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(quality.pixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -64,7 +66,9 @@ const lantern = new Lantern(quality.shadows, quality.shadowMapSize);
 scene.add(lantern.pivot);
 const input = new Input(renderer.domElement, rig.camera, () => terrain);
 const sound = new Soundscape();
-const fps = new FpsMeter(() => `\n${quality.level} · ${renderer.info.render.calls} draw`);
+const adaptive = new AdaptiveResolution(renderer, quality.pixelRatio, () => post.resize(renderer));
+if (new URLSearchParams(location.search).has('fixedres')) adaptive.update = () => {};
+const fps = new FpsMeter(() => `\n${quality.level} · ${renderer.info.render.calls} draw · ${adaptive.current.toFixed(2)}x`);
 input.onToggleFps = () => fps.toggle();
 
 const title = showTitle(() => {
@@ -93,7 +97,8 @@ let fade = 0;
 let nextStepAt = 0.65;
 
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05);
   const t = clock.elapsedTime;
 
   if (started) hero.update(dt, input, rig.camera, vegetation.colliders);
@@ -126,6 +131,7 @@ renderer.setAnimationLoop(() => {
   renderer.info.reset();
   post.render(t);
   fps.update(dt);
+  if (started) adaptive.update(rawDt);
 });
 
 window.addEventListener('resize', () => {

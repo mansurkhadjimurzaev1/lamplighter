@@ -141,9 +141,10 @@ export function createTerrain(): THREE.Mesh {
         '#include <map_fragment>',
         /* glsl */ `
         vec2 wp = vWorldP.xz;
-        vec4 cG = sampleTwo(tGrassC, wp, 0.32);
-        vec4 cD = sampleTwo(tDirtC, wp, 0.28);
-        vec4 cR = sampleTwo(tRockC, wp, 0.2);
+        // текстуры, которых в этой точке почти нет, не читаем вовсе — экономия на каждом пикселе
+        vec4 cG = vW.x > 0.004 ? sampleTwo(tGrassC, wp, 0.32) : vec4(0.0);
+        vec4 cD = vW.y > 0.004 ? sampleTwo(tDirtC, wp, 0.28) : vec4(0.0);
+        vec4 cR = vW.z > 0.004 ? sampleTwo(tRockC, wp, 0.2) : vec4(0.0);
         gW = blendW(vW, vec3(dot(cG.rgb, vec3(0.33)), dot(cD.rgb, vec3(0.33)), dot(cR.rgb, vec3(0.33))));
         vec3 col = cG.rgb * vec3(0.85, 1.0, 0.8) * gW.x + cD.rgb * gW.y + cR.rgb * gW.z;
         // крупные пятна вариации цвета
@@ -156,7 +157,11 @@ export function createTerrain(): THREE.Mesh {
         '#include <normal_fragment_maps>',
         THREE.ShaderChunk.normal_fragment_maps.replace(
           'vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;',
-          `vec3 mapN = (sampleTwo(tGrassN, wp, 0.32).xyz * gW.x + sampleTwo(tDirtN, wp, 0.28).xyz * gW.y + sampleTwo(tRockN, wp, 0.2).xyz * gW.z) * 2.0 - 1.0;`,
+          `vec3 mapN = vec3(0.0);
+           if (gW.x > 0.01) mapN += texture2D(tGrassN, wp * 0.32).xyz * gW.x;
+           if (gW.y > 0.01) mapN += texture2D(tDirtN, wp * 0.28).xyz * gW.y;
+           if (gW.z > 0.01) mapN += texture2D(tRockN, wp * 0.2).xyz * gW.z;
+           mapN = mapN / max(gW.x * step(0.01, gW.x) + gW.y * step(0.01, gW.y) + gW.z * step(0.01, gW.z), 1e-3) * 2.0 - 1.0;`,
         ),
       )
       .replace(

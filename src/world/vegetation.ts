@@ -73,6 +73,8 @@ const KINDS: Kind[] = [
 
 interface Part { geometry: THREE.BufferGeometry; material: THREE.Material }
 
+const CHUNK = 16;
+
 /** Разбираем GLB на (геометрия + материал), нормализуем размер: высота = 1, основание на y = 0. */
 function extractParts(root: THREE.Object3D): { parts: Part[]; width: number } {
   root.updateMatrixWorld(true);
@@ -243,14 +245,23 @@ export class Vegetation {
         placed++;
       }
 
+      // раскладываем по участкам 16×16 м: камера и тени фонаря рисуют только ближние участки
       for (const [file, mats] of perFile) {
-        for (const part of loaded.get(file)!.parts) {
-          const im = new THREE.InstancedMesh(part.geometry, part.material, mats.length);
-          mats.forEach((m, i) => im.setMatrixAt(i, m));
-          im.computeBoundingSphere();
-          im.castShadow = castShadows && !!kind.shadow;
-          im.receiveShadow = true;
-          this.group.add(im);
+        const byChunk = new Map<string, THREE.Matrix4[]>();
+        for (const m of mats) {
+          const key = Math.floor(m.elements[12] / CHUNK) + ':' + Math.floor(m.elements[14] / CHUNK);
+          if (!byChunk.has(key)) byChunk.set(key, []);
+          byChunk.get(key)!.push(m);
+        }
+        for (const list of byChunk.values()) {
+          for (const part of loaded.get(file)!.parts) {
+            const im = new THREE.InstancedMesh(part.geometry, part.material, list.length);
+            list.forEach((m, i) => im.setMatrixAt(i, m));
+            im.computeBoundingSphere();
+            im.castShadow = castShadows && !!kind.shadow;
+            im.receiveShadow = true;
+            this.group.add(im);
+          }
         }
       }
     }

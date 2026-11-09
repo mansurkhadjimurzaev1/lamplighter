@@ -41,3 +41,12 @@ export const quality: QualitySettings = {
   ...PRESETS[level],
   pixelRatio: Math.min(window.devicePixelRatio, PRESETS[level].pixelRatio),
 };
+
+// отладочные переопределения для замеров: ?shadows=0&grass=0&bloom=0&pr=1
+{
+  const p = new URLSearchParams(location.search);
+  if (p.has('shadows')) quality.shadows = p.get('shadows') === '1';
+  if (p.has('grass')) quality.grassPerSquareMeter = +p.get('grass')!;
+  if (p.has('bloom')) quality.bloom = p.get('bloom') === '1';
+  if (p.has('pr')) quality.pixelRatio = +p.get('pr')!;
+}

@@ -12,6 +12,10 @@
   Перед командами: `export PATH="$HOME/.local/node/bin:$PATH"`.
 - Из-за Node 22.11 используется Vite 6 (Vite 7 требует Node ≥ 22.12).
 - Запуск: `npm run dev` (уже с `--host`, порт 5173). Проверка типов и сборка: `npm run build`.
+- GitHub: https://github.com/mansurkhadjimurzaev1/lamplighter (публичный). gh CLI: `~/.local/bin/gh`.
+  Каждый push в main сам публикуется на https://mansurkhadjimurzaev1.github.io/lamplighter/
+  (.github/workflows/deploy.yml). В vite.config.ts `base: './'` — пути к ассетам только через BASE_URL.
+  «Закоммить» = коммит + push.
 - Самопроверка картинки: `node scripts/shot.mjs <url> <папка> [ширина] [высота]` — открывает игру
   в Chrome (puppeteer-core), стартует, ходит, сохраняет скриншоты и выводит ошибки консоли.
   `scripts/coast.mjs` — снимки берега и леса. В игре есть `window.__game` для таких проверок.

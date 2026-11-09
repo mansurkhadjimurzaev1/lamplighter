@@ -66,7 +66,7 @@ export class Lantern {
     this.light.castShadow = shadows;
     this.light.shadow.mapSize.set(shadowMapSize, shadowMapSize);
     this.light.shadow.camera.near = 0.05;
-    this.light.shadow.camera.far = 22;
+    this.light.shadow.camera.far = 13; // дальше свет почти не достаёт — не тратим время на тени
     this.light.shadow.bias = -0.002;
     this.light.shadow.radius = 3;
     this.body.add(this.light);
