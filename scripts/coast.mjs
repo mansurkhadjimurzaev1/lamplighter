@@ -1,0 +1,17 @@
+import puppeteer from 'puppeteer-core';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const out = process.argv[2];
+const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: 'new', args: ['--use-angle=metal'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 1280, height: 800 });
+page.on('pageerror', (e) => console.log('ERR', e.message));
+await page.goto('http://localhost:5173/', { waitUntil: 'networkidle0' });
+await page.waitForSelector('.title.ready');
+await page.mouse.click(640, 400);
+await page.evaluate(() => { const g = window.__game; let z = 20; while (g.heightAt(0, z) > 0.35) z += 0.2; g.hero.root.position.set(0, 0, z - 0.5); });
+await sleep(4000);
+await page.screenshot({ path: out + '/coast.png' });
+await page.evaluate(() => window.__game.hero.root.position.set(-18, 0, -10));
+await sleep(4000);
+await page.screenshot({ path: out + '/forest.png' });
+await browser.close();
