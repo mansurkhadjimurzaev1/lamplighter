@@ -8,23 +8,26 @@
 - Работаем по этапам, которые присылает автор. Не забегать вперёд.
 
 ## Окружение (заметки для Claude)
-- Node.js лежит в `~/.local/node/bin` (v22.11), в системном PATH его нет.
-  Перед командами: `export PATH="$HOME/.local/node/bin:$PATH"`.
-- Из-за Node 22.11 используется Vite 6 (Vite 7 требует Node ≥ 22.12).
-- Запуск: `npm run dev` (уже с `--host`, порт 5173). Проверка типов и сборка: `npm run build`.
+- Движок: **Godot 4.7.2** (с 2026-11-09; до этого была веб-версия на Three.js — тег `web-threejs-final`).
+  Godot: `~/Applications/Godot.app/Contents/MacOS/Godot` (в PATH нет). Шаблоны экспорта уже установлены.
+- Почти всё строится кодом (scripts/main.gd собирает мир); сцена scenes/main.tscn — пустой корень.
+  Структура: scripts/{core,world,player,fx,audio,ui}, shaders/*.gdshader, assets/{models,textures}.
+- После добавления/замены ассетов: `Godot --headless --path . --import`.
+- Проверка скриптов без окна: `Godot --headless --path . --quit-after 300` (ошибки — в выводе).
+- Самопроверка с окном и скриншотами: `Godot --path . --resolution 1280x800 -- --autotest=<папка>`
+  (заставка, старт, ходьба, берег, лес → PNG). `--quick` — один кадр в лесу.
+  Замер скорости без vsync: `-- --bench`. Качество: `-- --q=low|medium|high`; `--fps`, `--shadows=0`, `--grass=N`, `--vfog=0`.
+- Ярлык автора на рабочем столе «Последний фонарщик.app» запускает проект из папки — всегда свежая версия.
+- Готовое приложение для Mac: `Godot --headless --path . --export-release "macOS" exports/mac/Lamplighter.app`
+  (exports/ в .gitignore). Внутреннее имя проекта латиницей (`Lamplighter`) — иначе ломается подпись macOS;
+  русское/английское название — через config/name_localized.
 - GitHub: https://github.com/mansurkhadjimurzaev1/lamplighter (публичный). gh CLI: `~/.local/bin/gh`.
-  Каждый push в main сам публикуется на https://mansurkhadjimurzaev1.github.io/lamplighter/
-  (.github/workflows/deploy.yml). В vite.config.ts `base: './'` — пути к ассетам только через BASE_URL.
-  «Закоммить» = коммит + push.
-- Самопроверка картинки: `node scripts/shot.mjs <url> <папка> [ширина] [высота]` — открывает игру
-  в Chrome (puppeteer-core), стартует, ходит, сохраняет скриншоты и выводит ошибки консоли.
-  `scripts/coast.mjs` — снимки берега и леса. В игре есть `window.__game` для таких проверок.
-- Параметры адреса: `?q=low|medium|high` — качество, `?fps` — сразу показать fps,
-  `?bright` — отладочный светлый режим, `?debugn` — нормали камней цветом.
-- Подводные камни Three.js, на которые уже наступали:
-  - GLTFLoader убирает точки из имён узлов (`handslot.r` → `handslotr`).
-  - Материалы с одинаковым onBeforeCompile делят одну шейдерную программу — нужен `customProgramCacheKey`.
-  - У модели героя один материал на все части — не менять его в цикле по мешам.
+  «Закоммить» = коммит + push. Старая веб-версия ещё висит на GitHub Pages (автопубликация отключена).
+- Подводные камни Godot, на которые уже наступали:
+  - Цвет в `uniform vec3 x : source_color` передавать как `Color`, не `Vector3` (иначе цвет не применяется).
+  - Вектор в функцию передаётся копией — возвращать результат.
+  - На Mac (Metal) время GPU не измеряется (0 мс) — адаптивное разрешение работает по времени кадра.
+  - `emission_texture` = текстура альбедо даёт «светящегося» героя — не использовать.
   - В GLSL не писать `smoothstep(a, b, x)` с a > b — использовать `1.0 - smoothstep(b, a, x)`.
 
 ==================== БИБЛИЯ ИГРЫ ====================
@@ -115,14 +118,14 @@
 - Никто из людей не управляет солнцем — тьма от Пелены дыма.
 
 --- ТЕХНИКА ---
-- Vite + TypeScript + Three.js. Модульная структура:
-  src/world, src/player, src/npc, src/story, src/fx, src/audio, src/ui;
-  public/models, public/textures, public/audio.
+- Godot 4 (GDScript + шейдеры). Модульная структура:
+  scripts/world, scripts/player, scripts/npc, scripts/story, scripts/fx, scripts/audio, scripts/ui;
+  assets/models, assets/textures, assets/audio.
 - Управление: ПК — WASD + мышь; телефон — тап по земле = идти туда.
 - Цель — 60 fps на телефоне; настройки качества (низкое/среднее/высокое).
 - Языки: русский (основной), английский.
-- Сохранения в localStorage.
-- Позже: ПК-приложение через Tauri, телефон — PWA и Capacitor.
+- Сохранения в user:// (файл сохранения Godot).
+- Сборки: Mac/Windows/Linux — экспорт Godot (Steam); Android — APK/AAB (Google Play); iPhone — через Xcode.
 
 --- ПРАВИЛА РАБОТЫ ---
 - Работаем по этапам, которые я присылаю. Не забегай вперёд.

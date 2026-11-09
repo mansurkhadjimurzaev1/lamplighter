@@ -1,4 +1,6 @@
-node_modules
-dist
+# Godot
+.godot/
+export_presets.cfg.bak
+/exports/
+/screenshots/
 .DS_Store
-*.log
