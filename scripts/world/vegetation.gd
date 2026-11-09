@@ -9,6 +9,8 @@ const BASE := "res://assets/models/nature/"
 
 ## Круги, через которые нельзя пройти: Vector3(x, z, радиус)
 var colliders: Array[Vector3] = []
+## Места, где ничего не растёт (вокруг маяков): Vector3(x, z, радиус)
+var exclusions: Array[Vector3] = []
 
 var _rng := RandomNumberGenerator.new()
 var _forest := FastNoiseLite.new()
@@ -48,7 +50,7 @@ func _kinds() -> Array:
 
 
 ## Разбираем модель на меши с их положением; нормализуем: высота 1, основание на y = 0
-func _load_model(file: String) -> Dictionary:
+func _load_model(file: String, grow := false) -> Dictionary:
 	var scene: PackedScene = load(BASE + file + ".glb")
 	var root := scene.instantiate()
 	var parts: Array = []
@@ -64,7 +66,7 @@ func _load_model(file: String) -> Dictionary:
 	norm = norm * Transform3D(Basis.IDENTITY, -Vector3(box.get_center().x, box.position.y, box.get_center().z))
 	var out_parts: Array = []
 	for p in parts:
-		out_parts.append({mesh = _with_materials(p.mesh, p.node), xf = norm * p.xf})
+		out_parts.append({mesh = _with_materials(p.mesh, p.node, grow), xf = norm * p.xf})
 	root.free()
 	return {parts = out_parts, width = maxf(box.size.x, box.size.z) / box.size.y}
 
@@ -80,7 +82,7 @@ func _rel_transform(n: Node3D, root: Node) -> Transform3D:
 
 
 ## Заменяем материалы модели нашим шейдером (с теми же базовыми цветами)
-func _with_materials(mesh: Mesh, node: MeshInstance3D) -> Mesh:
+func _with_materials(mesh: Mesh, node: MeshInstance3D, grow := false) -> Mesh:
 	var m: Mesh = mesh.duplicate()
 	for i in m.get_surface_count():
 		var src: Material = node.get_surface_override_material(i)
@@ -102,6 +104,7 @@ func _with_materials(mesh: Mesh, node: MeshInstance3D) -> Mesh:
 		sm.set_shader_parameter("albedo", Color(col.r, col.g, col.b))
 		sm.set_shader_parameter("kind", kind)
 		sm.set_shader_parameter("rock_tex", _rock_tex)
+		sm.set_shader_parameter("grow", 1 if grow else 0)
 		m.surface_set_material(i, sm)
 	return m
 
@@ -142,6 +145,9 @@ func build(cast_shadows: bool) -> void:
 			var collide: float = kind.collide
 			var radius := maxf(0.3, model.width * height * (collide if collide > 0.0 else 0.15))
 			var blocked := false
+			for ex in exclusions:
+				if Vector2(ex.x - x, ex.y - z).length() < ex.z:
+					blocked = true
 			for c in occupied:
 				if Vector2(c.x - x, c.y - z).length() < c.z + radius:
 					blocked = true
@@ -187,3 +193,119 @@ func build(cast_shadows: bool) -> void:
 				mmi.multimesh = mm
 				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and kind.shadow) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				add_child(mmi)
+
+
+## Цветы, которые распускаются, когда до них доходит волна оживания маяка
+func build_bloom(center: Vector3, radius: float, count: int) -> Node3D:
+	var root := Node3D.new()
+	root.name = "Bloom"
+	root.top_level = true
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(center.x * 100.0 + center.z)
+	var models: Array = [_load_model("Flowers", true)]
+	for c in [Color(0.97, 0.95, 0.9), Color(0.98, 0.72, 0.8), Color(0.78, 0.7, 0.95), Color(1.0, 0.88, 0.45), Color(0.7, 0.84, 1.0)]:
+		models.append({parts = [{mesh = _flower_mesh(c), xf = Transform3D.IDENTITY}], width = 0.6})
+	var buckets: Array = []
+	for m in models:
+		buckets.append([])
+	var placed := 0
+	var tries := 0
+	while placed < count and tries < count * 20:
+		tries += 1
+		var a := rng.randf() * TAU
+		var d := sqrt(rng.randf()) * radius
+		var x := center.x + cos(a) * d
+		var z := center.z + sin(a) * d
+		var h := Terrain.height_at(x, z)
+		if h < 0.4 or Terrain.weights_at(x, z).x < 0.25:
+			continue
+		if Vector2(x - center.x, z - center.z).length() < 2.2:
+			continue
+		var blocked := false
+		for c in colliders:
+			if Vector2(c.x - x, c.y - z).length() < c.z + 0.2:
+				blocked = true
+				break
+		if blocked:
+			continue
+		var mi := 0 if rng.randf() < 0.3 else 1 + rng.randi() % (models.size() - 1)
+		var s := rng.randf_range(0.42, 0.7) if mi > 0 else rng.randf_range(0.45, 0.7)
+		var b := Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3(s, s, s))
+		b = b.rotated(Vector3.RIGHT, rng.randf_range(-0.12, 0.12))
+		buckets[mi].append([Transform3D(b, Vector3(x, h - 0.02, z)), Color(h - 0.02, s, x, z)])
+		placed += 1
+	for i in models.size():
+		if buckets[i].is_empty():
+			continue
+		for part in models[i].parts:
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_custom_data = true
+			mm.mesh = part.mesh
+			mm.instance_count = buckets[i].size()
+			for k in buckets[i].size():
+				mm.set_instance_transform(k, buckets[i][k][0] * part.xf)
+				mm.set_instance_custom_data(k, buckets[i][k][1])
+			var mmi := MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(mmi)
+	return root
+
+
+## Простой цветок высотой 1: стебель, пять лепестков, серединка
+func _flower_mesh(petal: Color) -> ArrayMesh:
+	var mesh := ArrayMesh.new()
+	_add_surface(mesh, _stem_arrays(), Color(0.2, 0.42, 0.12))
+	_add_surface(mesh, _petal_arrays(), petal)
+	_add_surface(mesh, _center_arrays(), Color(1.0, 0.78, 0.25))
+	return mesh
+
+
+func _add_surface(mesh: ArrayMesh, verts: PackedVector3Array, col: Color) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for v in verts:
+		st.add_vertex(v)
+	st.generate_normals()
+	st.index()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, st.commit_to_arrays())
+	var sm := ShaderMaterial.new()
+	sm.shader = preload("res://shaders/foliage.gdshader")
+	sm.set_shader_parameter("albedo", col)
+	sm.set_shader_parameter("kind", 3)
+	sm.set_shader_parameter("grow", 1)
+	mesh.surface_set_material(mesh.get_surface_count() - 1, sm)
+
+
+func _stem_arrays() -> PackedVector3Array:
+	var w := 0.035
+	var a := PackedVector3Array()
+	for side in [Vector3(w, 0, 0), Vector3(0, 0, w)]:
+		a.append_array([-side, side, side + Vector3(0, 0.88, 0), -side, side + Vector3(0, 0.88, 0), -side + Vector3(0, 0.88, 0)])
+		a.append_array([side, -side, -side + Vector3(0, 0.88, 0), side, -side + Vector3(0, 0.88, 0), side + Vector3(0, 0.88, 0)])
+	return a
+
+
+func _petal_arrays() -> PackedVector3Array:
+	var a := PackedVector3Array()
+	var c := Vector3(0, 0.9, 0)
+	for i in 5:
+		var ang := i * TAU / 5.0
+		var dir := Vector3(cos(ang), 0.28, sin(ang))
+		var side := Vector3(-sin(ang), 0, cos(ang)) * 0.11
+		var tip := c + dir * 0.32
+		var mid := c + dir * 0.16
+		a.append_array([c, mid + side, tip, c, tip, mid - side])
+		a.append_array([c, tip, mid + side, c, mid - side, tip])
+	return a
+
+
+func _center_arrays() -> PackedVector3Array:
+	var a := PackedVector3Array()
+	var c := Vector3(0, 0.95, 0)
+	for i in 6:
+		var a0 := i * TAU / 6.0
+		var a1 := (i + 1) * TAU / 6.0
+		a.append_array([c + Vector3(0, 0.03, 0), c + Vector3(cos(a1), 0, sin(a1)) * 0.07, c + Vector3(cos(a0), 0, sin(a0)) * 0.07])
+	return a

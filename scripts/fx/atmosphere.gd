@@ -67,3 +67,14 @@ static func grade_layer(parent: Node) -> ShaderMaterial:
 	layer.add_child(rect)
 	parent.add_child(layer)
 	return mat
+
+
+## Переход ночь → рассвет вокруг героя (0..1)
+static func set_dawn(we: WorldEnvironment, d: float) -> void:
+	var env := we.environment
+	env.ambient_light_color = Color(0.22, 0.27, 0.55).lerp(Color(0.78, 0.66, 0.6), d)
+	env.ambient_light_energy = lerpf(0.75, 1.05, d)
+	env.fog_light_color = Color(0.04, 0.05, 0.13).lerp(Color(0.42, 0.33, 0.36), d)
+	env.fog_density = lerpf(0.03, 0.016, d)
+	env.background_color = Color(0.027, 0.039, 0.1).lerp(Color(0.38, 0.29, 0.33), d)
+	env.adjustment_saturation = lerpf(0.95, 1.08, d)

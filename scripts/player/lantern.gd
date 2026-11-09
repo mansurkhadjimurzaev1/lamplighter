@@ -14,7 +14,12 @@ var _last_pos := Vector3.ZERO
 var _last_vel := Vector3.ZERO
 var _has_last := false
 var _t := 0.0
+var _raise := 0.0 # 0 — висит в руке, 1 — поднят
+var _fill: OmniLight3D
+var _dip := 0.0 # внезапные «провалы» пламени при малом масле
+var _dip_timer := 0.0
 const BASE_ENERGY := 4.5
+const BASE_RANGE := 14.0
 
 
 func build(shadows: bool) -> void:
@@ -88,7 +93,8 @@ func build(shadows: bool) -> void:
 	_body.add_child(light)
 
 	# слабый отсвет фонаря на лицо и плечи героя (без теней, дешёвый)
-	var fill := OmniLight3D.new()
+	_fill = OmniLight3D.new()
+	var fill := _fill
 	fill.light_color = Color(1.0, 0.6, 0.3)
 	fill.light_energy = 0.9
 	fill.omni_range = 1.6
@@ -109,9 +115,12 @@ func _add_part(m: Mesh, mat: Material, pos: Vector3, rot := Vector3.ZERO) -> Mes
 	return mi
 
 
-## pivot_world — точка в руке героя
-func update_lantern(dt: float, pivot_world: Vector3) -> void:
+## pivot_world — точка в руке героя; oil — уровень масла 0..1; raised — поднят ли фонарь
+func update_lantern(dt: float, pivot_world: Vector3, oil := 1.0, raised := false) -> void:
 	_t += dt
+	_raise = move_toward(_raise, 1.0 if raised else 0.0, dt * 3.5)
+	var lift := _raise * _raise * (3.0 - 2.0 * _raise)
+	pivot_world += Vector3(0, 0.75, 0) * lift
 	dt = maxf(dt, 0.001)
 	var vel := (pivot_world - _last_pos) / dt if _has_last else Vector3.ZERO
 	var acc := ((vel - _last_vel) / dt).limit_length(40.0) if _has_last else Vector3.ZERO
@@ -131,10 +140,23 @@ func update_lantern(dt: float, pivot_world: Vector3) -> void:
 	# мерцание: медленное «дыхание» + быстрая дрожь пламени
 	var slow := _noise.get_noise_2d(_t * 0.7, 0.3)
 	var fast := _noise.get_noise_2d(_t * 9.0, 4.1) * 0.6 + _noise.get_noise_2d(_t * 23.0, 8.7) * 0.4
-	var f := 1.0 + slow * 0.12 + fast * 0.12
-	light.light_energy = BASE_ENERGY * f
-	_flame.scale = Vector3(1.0 + fast * 0.15, 1.9 + fast * 0.5 + slow * 0.2, 1.0 + fast * 0.15)
-	_flame_mat.emission_energy_multiplier = 12.0 * f
+	# малое масло: свет сжимается и дрожит, иногда «проваливается»
+	var low := clampf(1.0 - oil / 0.25, 0.0, 1.0)
+	_dip_timer -= dt
+	if low > 0.0 and _dip_timer <= 0.0:
+		_dip_timer = randf_range(0.4, 2.5) * (1.2 - low)
+		_dip = randf_range(0.3, 0.7) * low
+	_dip = move_toward(_dip, 0.0, dt * 2.5)
+	var jitter := _noise.get_noise_2d(_t * 31.0, 1.7) * 0.35 * low
+	var f := (1.0 + slow * 0.12 + fast * (0.12 + 0.25 * low) + jitter) * (1.0 - _dip)
+	var amount := lerpf(0.22, 1.0, sqrt(oil)) # яркость и радиус — по маслу
+	light.light_energy = BASE_ENERGY * f * amount * (1.0 + 0.6 * lift)
+	light.omni_range = BASE_RANGE * lerpf(0.3, 1.0, sqrt(oil)) * (1.0 + 0.4 * lift)
+	_fill.light_energy = 0.9 * amount * f
+	_fill.position = Vector3(-0.15, 0.55 - 0.75 * lift, 0.15)
+	var fs := lerpf(0.55, 1.0, sqrt(oil))
+	_flame.scale = Vector3(1.0 + fast * 0.15, 1.9 + fast * 0.5 + slow * 0.2, 1.0 + fast * 0.15) * fs * (1.0 + 0.2 * lift)
+	_flame_mat.emission_energy_multiplier = 12.0 * f * amount * (1.0 + 0.5 * lift)
 	light.position = Vector3(fast * 0.006, -0.24 + slow * 0.005, _noise.get_noise_2d(_t * 11.0, 2.0) * 0.006)
 
 

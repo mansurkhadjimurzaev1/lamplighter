@@ -3,6 +3,7 @@ extends CanvasLayer
 ## Заставка с названием. Любая клавиша / клик / тап — начать.
 
 signal started
+signal new_game
 
 var _root := Control.new()
 var _hint: Label
@@ -49,7 +50,10 @@ func build() -> void:
 	_hint = _label("Коснитесь, чтобы начать" if touch else "Нажмите любую клавишу", font, 20, Color(0.95, 0.84, 0.65, 0.0))
 	box.add_child(_hint)
 
-	var controls := _label("Тап по земле — идти" if touch else "WASD — идти  ·  клик по земле — идти туда  ·  F — fps  ·  Esc — выход", font, 15, Color(0.95, 0.84, 0.65, 0.45))
+	var ctl := "Тап — идти  ·  долгое касание — поднять фонарь" if touch else "WASD / клик — идти  ·  пробел — поднять фонарь  ·  E — зажечь маяк  ·  F — fps  ·  Esc — выход"
+	if SaveGame.has_save() and not touch:
+		ctl += "\nN — начать заново"
+	var controls := _label(ctl, font, 15, Color(0.95, 0.84, 0.65, 0.45))
 	controls.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	controls.position.y -= 40
 	controls.grow_horizontal = Control.GROW_DIRECTION_BOTH
@@ -85,6 +89,11 @@ func _input(e: InputEvent) -> void:
 	if not _ready_to_start or _done:
 		return
 	var pressed: bool = (e is InputEventKey and e.pressed) or (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed)
+	if e is InputEventKey and e.pressed and e.physical_keycode == KEY_N and SaveGame.has_save():
+		_done = true
+		new_game.emit()
+		get_viewport().set_input_as_handled()
+		return
 	if pressed:
 		start()
 		get_viewport().set_input_as_handled()

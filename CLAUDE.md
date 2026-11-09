@@ -23,7 +23,16 @@
   русское/английское название — через config/name_localized.
 - GitHub: https://github.com/mansurkhadjimurzaev1/lamplighter (публичный). gh CLI: `~/.local/bin/gh`.
   «Закоммить» = коммит + push. Старая веб-версия ещё висит на GitHub Pages (автопубликация отключена).
+- Механики (этап 2): масло — scripts/player/oil.gd; маяк и «оживание» — scripts/world/beacon.gd
+  (+ shaders/restore.gdshaderinc: глобальные beacon_0..4 = позиция+радиус, beacon_wave = фронт волны;
+  restore_at() в шейдерах и Beacon.restore_at() в коде — одна формула). Тени — scripts/npc/.
+  Звуки областей — scripts/audio/region_audio.gd (REGIONS: 5 областей + тестовый остров), синтез — synth.gd.
+  Сохранение — scripts/core/save_game.gd (user://save.json, пишется только при зажжении маяка).
+  Тестовые аргументы: `--newgame` (игнорировать сохранение), `--nosave`, `--shadetest`.
+  ВАЖНО: автотест без `--nosave` записывает сохранение — после проверок удалять
+  `~/Library/Application Support/Godot/app_userdata/Lamplighter/save.json`.
 - Подводные камни Godot, на которые уже наступали:
+  - Размер модели считать по рамке с учётом global_transform (у KayKit внутри свой масштаб).
   - Цвет в `uniform vec3 x : source_color` передавать как `Color`, не `Vector3` (иначе цвет не применяется).
   - Вектор в функцию передаётся копией — возвращать результат.
   - На Mac (Metal) время GPU не измеряется (0 мс) — адаптивное разрешение работает по времени кадра.

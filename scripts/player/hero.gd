@@ -15,6 +15,7 @@ var facing := 0.0
 var distance := 0.0 # пройденный путь — для звука шагов
 var move_target: Variant = null # точка после тапа/клика
 var _walking := false
+var _busy := 0.0 # пока > 0 — герой занят анимацией (пробуждение)
 
 
 func build() -> void:
@@ -65,7 +66,28 @@ func hand_position() -> Vector3:
 	return global_position + Vector3(0.3, 0.7, 0)
 
 
+## Пробуждение после обморока
+func wake() -> void:
+	_busy = 2.6
+	_walking = false
+	speed = 0.0
+	move_target = null
+	if anim.has_animation("Lie_StandUp"):
+		anim.play("Lie_StandUp")
+		anim.speed_scale = 0.8
+		anim.queue("Idle")
+
+
+func face(p: Vector3) -> void:
+	facing = atan2(p.x - global_position.x, p.z - global_position.z)
+	rotation.y = facing
+
+
 func update_hero(dt: float, input_dir: Vector2, cam: Camera3D, colliders: Array[Vector3], active: bool) -> void:
+	if _busy > 0.0:
+		_busy -= dt
+		global_position.y = Terrain.height_at(global_position.x, global_position.z)
+		return
 	var dir := Vector3.ZERO
 	if active:
 		if input_dir.length_squared() > 0.0:

@@ -6,12 +6,15 @@ shader_type spatial;
 render_mode cull_back;
 
 #include "res://shaders/include_map.gdshaderinc"
+#include "res://shaders/restore.gdshaderinc"
 
 global uniform vec3 hero_pos;
 
 uniform vec3 albedo : source_color = vec3(0.5);
 uniform int kind = 0; // 0 — листва/прочее, 1 — камень, 2 — дерево (кора)
 uniform sampler2D rock_tex : source_color, filter_linear_mipmap, repeat_enable;
+// 1 — растение «вырастает», когда сюда доходит оживание (цветы у маяка)
+uniform int grow = 0;
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -19,6 +22,15 @@ varying float ly; // 0 — у земли, 1 — верхушка
 
 void vertex() {
 	vec3 wp = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	if (grow == 1) {
+		// INSTANCE_CUSTOM: x — высота основания, z/w — x/z основания
+		vec3 base = vec3(INSTANCE_CUSTOM.z, INSTANCE_CUSTOM.x, INSTANCE_CUSTOM.w);
+		float delay = hash12(base.xz) * 0.35;
+		float g = smoothstep(delay, delay + 0.6, restore_at(base));
+		g = g * (1.0 + 0.25 * sin(g * 3.14159)); // лёгкий «пружинящий» рост
+		wp = base + (wp - base) * g;
+		VERTEX = (inverse(MODEL_MATRIX) * vec4(wp, 1.0)).xyz;
+	}
 	// INSTANCE_CUSTOM: x — высота основания, y — высота модели
 	ly = clamp((wp.y - INSTANCE_CUSTOM.x) / max(INSTANCE_CUSTOM.y, 0.01), 0.0, 1.0);
 	w_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
@@ -60,7 +72,11 @@ void fragment() {
 		float fib = vnoise(vec2(atan(w_nrm.z, w_nrm.x) * 6.0, w_pos.y * 0.8)) * 0.5 + vnoise(w_pos.xz * 30.0 + w_pos.y * 2.0) * 0.5;
 		col *= mix(0.6, 1.25, fib);
 	}
-	ALBEDO = col;
+	float rs = restore_at(w_pos);
+	vec3 night = mix(vec3(dot(col, vec3(0.33))), col, 0.7);
+	vec3 alive = kind == 0 ? col * vec3(1.05, 1.4, 0.9) * 1.2 : col * 1.15;
+	ALBEDO = mix(night, alive, rs);
+	EMISSION = vec3(1.0, 0.68, 0.32) * wave_edge(w_pos) * 0.5;
 	ROUGHNESS = rough;
 	SPECULAR = 0.3;
 }

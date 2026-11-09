@@ -23,6 +23,7 @@ window/handheld/orientation=6
 [input_devices]
 
 pointing/emulate_touch_from_mouse=false
+pointing/emulate_mouse_from_touch=false
 
 [rendering]
 
@@ -43,4 +44,28 @@ hero_pos={
 lantern_pos={
 "type": "vec3",
 "value": Vector3(0, -100, 0)
+}
+beacon_0={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+beacon_1={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+beacon_2={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+beacon_3={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+beacon_4={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+beacon_wave={
+"type": "vec4",
+"value": Vector4(0, 0, 0, -1)
 }

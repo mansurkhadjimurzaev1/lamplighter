@@ -2,6 +2,8 @@
 shader_type spatial;
 render_mode cull_back;
 
+#include "res://shaders/restore.gdshaderinc"
+
 uniform sampler2D grass_c : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D dirt_c : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
@@ -42,7 +44,12 @@ void fragment() {
 	vec3 gw = blend_w(w, vec3(dot(cg.rgb, vec3(0.33)), dot(cd.rgb, vec3(0.33)), dot(cr.rgb, vec3(0.33))));
 	vec3 col = cg.rgb * vec3(0.85, 1.0, 0.8) * gw.x + cd.rgb * gw.y + cr.rgb * gw.z;
 	col *= mix(0.75, 1.15, texture(dirt_c, wp * 0.013).r); // крупные пятна
-	ALBEDO = col;
+	// ночь под Пеленой — краски приглушены; ожившая земля — сочная и тёплая
+	float rs = restore_at(w_pos);
+	vec3 night = mix(vec3(dot(col, vec3(0.33))), col, 0.7);
+	vec3 alive = col * mix(vec3(1.12, 1.05, 0.92), vec3(0.95, 1.45, 0.75), gw.x) * 1.15;
+	ALBEDO = mix(night, alive, rs);
+	EMISSION = vec3(1.0, 0.68, 0.32) * wave_edge(w_pos) * 0.9;
 	ROUGHNESS = 0.95 - gw.z * 0.25;
 
 	// рельеф поверхности: нормали текстур смешиваются и «наклоняют» нормаль земли
