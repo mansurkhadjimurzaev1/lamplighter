@@ -7,6 +7,7 @@ render_mode cull_disabled, world_vertex_coords;
 #include "res://shaders/restore.gdshaderinc"
 
 global uniform vec3 hero_pos;
+global uniform float wind_strength; // 1 — обычно, в горах — ледяной ветер сильнее
 
 varying float tip;
 varying vec3 tint;
@@ -32,7 +33,7 @@ void vertex() {
 	float gust = sin(TIME * 0.35 + wp.x * 0.05 + wp.y * 0.03) * 0.5 + 0.5;
 	float wv = sin(TIME * 1.6 + wp.x * 0.45 + wp.y * 0.25) * 0.6 + sin(TIME * 2.7 + wp.x * 0.9 - wp.y * 0.7) * 0.25;
 	vec2 wind_dir = normalize(vec2(1.0, 0.35));
-	vec2 off = wind_dir * (wv * (0.06 + gust * 0.14) + gust * 0.12) * k;
+	vec2 off = wind_dir * (wv * (0.06 + gust * 0.14) + gust * 0.12) * k * wind_strength;
 
 	// расступается вокруг героя
 	vec2 d = wp - hero_pos.xz;

@@ -22,18 +22,22 @@ static func fireflies(count: int) -> MultiMeshInstance3D:
 	var tries := 0
 	while i < count and tries < count * 50:
 		tries += 1
-		var a := rng.randf() * TAU
-		var d := sqrt(rng.randf()) * Terrain.ISLAND_RADIUS
-		var x := cos(a) * d
-		var z := sin(a) * d
+		var x := rng.randf_range(Terrain.MIN.x, Terrain.MAX.x)
+		var z := rng.randf_range(Terrain.MIN.y, Terrain.MAX.y)
 		var h := Terrain.height_at(x, z)
 		if h < 0.3:
+			continue
+		# в руинах замка светлячков нет — там абсолютная тьма
+		if CastleLayout.region_factor(x, z) > 0.0:
+			continue
+		# в лесу светлячков больше, они держатся у троп
+		if ForestLayout.in_core(x, z) and ForestLayout.path_dist(x, z) > 2.5:
 			continue
 		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, Vector3(x, h + 0.4 + rng.randf() * 1.8, z)))
 		mm.set_instance_custom_data(i, Color(rng.randf() * 100.0, 0.5 + rng.randf(), rng.randf(), 0))
 		i += 1
 	mm.visible_instance_count = i
-	mm.custom_aabb = AABB(Vector3(-60, -10, -60), Vector3(120, 30, 120))
+	mm.custom_aabb = AABB(Vector3(Terrain.MIN.x, -10, Terrain.MIN.y), Vector3(Terrain.MAX.x - Terrain.MIN.x, 40, Terrain.MAX.y - Terrain.MIN.y))
 	return _instance(mm, "res://shaders/fireflies.gdshader")
 
 

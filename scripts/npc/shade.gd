@@ -27,24 +27,25 @@ var _wander_target := Vector3.ZERO
 var _wander_timer := 0.0
 var _seed := 0.0
 var _model: Node3D
+## Тени замка: быстрее, их труднее рассеять, похожи на людей (стража, придворные)
+var speed_mult := 1.0
+var toughness := 1.0
 
 
-func build(model_scene: PackedScene, rng: RandomNumberGenerator) -> void:
+func build(model_scene: PackedScene, rng: RandomNumberGenerator, height := 1.75, extra_hide: Array = []) -> void:
 	name = "Shade"
 	_seed = rng.randf() * 100.0
 	_model = model_scene.instantiate()
 	add_child(_model)
 	_mat = ShaderMaterial.new()
 	_mat.shader = load("res://shaders/shade.gdshader")
-	_mat.set_shader_parameter("height_map", Terrain.height_tex)
-	_mat.set_shader_parameter("map_size", Terrain.SIZE)
-	_mat.set_shader_parameter("map_res", float(Terrain.SEGS + 1))
+	Terrain.apply_map(_mat)
 	_mat.set_shader_parameter("seed", _seed)
 	var box := AABB()
 	var first := true
 	var head_mi: MeshInstance3D = null
 	for mi: MeshInstance3D in _model.find_children("*", "MeshInstance3D", true, false):
-		if mi.name in Hero.HIDE or mi.get_parent().name in Hero.HIDE:
+		if mi.name in Hero.HIDE or mi.get_parent().name in Hero.HIDE or mi.name in extra_hide or mi.get_parent().name in extra_hide:
 			mi.visible = false
 			continue
 		mi.material_override = _mat
@@ -55,10 +56,10 @@ func build(model_scene: PackedScene, rng: RandomNumberGenerator) -> void:
 		if "Head" in mi.name:
 			head_mi = mi
 	for n in _model.find_children("*", "", true, false):
-		if n.name in Hero.HIDE and n is Node3D:
+		if (n.name in Hero.HIDE or n.name in extra_hide) and n is Node3D:
 			(n as Node3D).visible = false
 	# Тени чуть выше и тоньше человека
-	var s := 1.75 / maxf(box.size.y, 0.01) * rng.randf_range(0.92, 1.12)
+	var s := height / maxf(box.size.y, 0.01) * rng.randf_range(0.92, 1.12)
 	_model.scale = Vector3(s * 0.85, s, s * 0.85)
 
 	# тусклые глаза в глубине капюшона
@@ -152,8 +153,8 @@ func tick(dt: float, hero: Vector3, light_r: float, strong: bool, out: bool, col
 	var move := Vector3.ZERO
 	var speed := 0.0
 
-	# ожившая земля — Теням там не место
-	if Beacon.restore_at(global_position) > 0.25:
+	# ожившая земля и огни деревни — Теням там не место
+	if Beacon.restore_at(global_position) > 0.25 or VillageLayout.in_village(global_position.x, global_position.z, -2.0):
 		disperse(sound)
 		return false
 
@@ -182,7 +183,7 @@ func tick(dt: float, hero: Vector3, light_r: float, strong: bool, out: bool, col
 		State.STALK:
 			if out or dist > hold + 0.3:
 				move = dir
-				speed = STALK_SPEED * (1.4 if out else 1.0)
+				speed = STALK_SPEED * (1.4 if out else 1.0) * speed_mult
 			_fear = move_toward(_fear, 0.15, dt)
 		State.AFRAID:
 			# отступает от света и дрожит
@@ -192,7 +193,7 @@ func tick(dt: float, hero: Vector3, light_r: float, strong: bool, out: bool, col
 
 	# в сильном свете Тень накапливает «страх» и рассеивается
 	if not out and (dist < light_r * 0.6 or (strong and dist < light_r * 0.95)):
-		exposure += dt * (1.5 if strong else 0.3)
+		exposure += dt * (1.5 if strong else 0.3) / toughness
 	else:
 		exposure = maxf(0.0, exposure - dt * 0.5)
 	if exposure >= 1.0:

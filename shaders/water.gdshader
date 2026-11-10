@@ -7,6 +7,7 @@ render_mode blend_mix, cull_back, depth_draw_opaque;
 
 global uniform vec3 lantern_pos;
 uniform sampler2D ripple : hint_normal, filter_linear_mipmap, repeat_enable;
+uniform vec3 swamp = vec3(74.0, -12.0, 38.0); // здесь своя вода (топь)
 
 varying vec3 w_pos;
 
@@ -15,6 +16,7 @@ void vertex() {
 }
 
 void fragment() {
+	if (distance(w_pos.xz, swamp.xy) < swamp.z) discard;
 	vec2 uv = map_uv(w_pos.xz);
 	bool inside = uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0;
 	float depth = inside ? -texture(height_map, uv).r : 4.0;
@@ -32,7 +34,7 @@ void fragment() {
 	vec3 emit = vec3(0.05, 0.07, 0.12) * edge;
 
 	vec2 dl = w_pos.xz - lantern_pos.xz;
-	float shimmer = 0.55 + 0.45 * sin(w_pos.x * 7.0 + TIME * 2.1) * sin(w_pos.z * 6.0 - TIME * 1.7);
+	float shimmer = 0.65 + 0.35 * sin(dot(w_pos.xz, vec2(4.3, 2.1)) + TIME * 2.1 + vnoise(w_pos.xz * 1.7 + TIME * 0.4) * 5.0);
 	float glow = exp(-dot(dl, dl) * 0.35) * shimmer;
 	emit += vec3(1.0, 0.5, 0.18) * glow * 0.45;
 	EMISSION = emit;

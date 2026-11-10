@@ -6,11 +6,10 @@ extends Node
 
 ## Описание областей (5 из библии + тестовый остров). layers — имена слоёв.
 const REGIONS := {
-	"island": {name = "Остров (тест)", beacon = 0, layers = ["birds", "crickets"]},
-	"village": {name = "Тихий Брод", beacon = -1, layers = ["roosters", "voices", "well", "sheep"]},
-	"forest": {name = "Шепчущий лес", beacon = -1, layers = ["birds", "rustle", "woodpecker"]},
-	"swamp": {name = "Топь", beacon = -1, layers = ["frogs", "water", "dragonflies"]},
-	"mountains": {name = "Горная обсерватория", beacon = -1, layers = ["wind_high", "eagles", "waterfall"]},
+	"village": {name = "Тихий Брод", beacon = 0, layers = ["birds", "crickets"]}, # + петухи, голоса, колодец, овцы — звучат с мест (Village)
+	"forest": {name = "Шепчущий лес", beacon = 1, layers = ["birds", "rustle", "woodpecker"]},
+	"swamp": {name = "Топь", beacon = 2, layers = ["frogs", "water", "dragonflies"]},
+	"mountains": {name = "Горная обсерватория", beacon = 3, layers = ["wind_high", "eagles", "waterfall"]},
 	"castle": {name = "Руины замка", beacon = -1, layers = ["all"]},
 }
 
@@ -20,8 +19,17 @@ var _levels := {} # слой → текущая громкость 0..1
 
 func build() -> void:
 	name = "RegionAudio"
-	_add_layer("birds", [Synth.birds(14.0, 1.0, 11), Synth.birds(11.0, 0.7, 23)], [-0.5, 0.5], 0.55)
-	_add_layer("crickets", [Synth.crickets(8.0, 5, 31), Synth.crickets(6.0, 4, 37)], [-0.35, 0.35], 0.35)
+	var c := func(key: String, fn: Callable) -> AudioStreamWAV: return Synth.cached(key, fn, true)
+	_add_layer("birds", [c.call("birds_a", func(): return Synth.birds(14.0, 1.0, 11)), c.call("birds_b", func(): return Synth.birds(11.0, 0.7, 23))], [-0.5, 0.5], 0.55)
+	_add_layer("crickets", [c.call("crickets_a", func(): return Synth.crickets(8.0, 5, 31)), c.call("crickets_b", func(): return Synth.crickets(6.0, 4, 37))], [-0.35, 0.35], 0.35)
+	_add_layer("rustle", [c.call("rustle_a", func(): return Synth.rustle(12.0, 41)), c.call("rustle_b", func(): return Synth.rustle(9.0, 43))], [-0.6, 0.6], 0.5)
+	_add_layer("woodpecker", [c.call("woodpecker", func(): return Synth.woodpecker(23.0, 47))], [0.4], 0.5)
+	_add_layer("wind_high", [c.call("howl_a", func(): return Synth.howl(12.0, 71))], [0.3], 0.35)
+	_add_layer("eagles", [c.call("eagles_a", func(): return Synth.eagles(21.0, 73)), c.call("eagles_b", func(): return Synth.eagles(17.0, 79))], [-0.5, 0.5], 0.45)
+	_add_layer("waterfall", [c.call("waterfall_a", func(): return Synth.waterfall(8.0, 83))], [-0.6], 0.4)
+	_add_layer("frogs", [c.call("frogs_a", func(): return Synth.frogs(13.0, 5, 51)), c.call("frogs_b", func(): return Synth.frogs(17.0, 4, 53))], [-0.55, 0.55], 0.55)
+	_add_layer("water", [c.call("babble_a", func(): return Synth.babble(9.0, 57))], [0.0], 0.45)
+	_add_layer("dragonflies", [c.call("dragonflies_a", func(): return Synth.dragonflies(15.0, 59)), c.call("dragonflies_b", func(): return Synth.dragonflies(11.0, 61))], [-0.4, 0.4], 0.45)
 
 
 func _add_layer(id: String, loops: Array, pans: Array, volume: float) -> void:
@@ -38,7 +46,7 @@ func _add_layer(id: String, loops: Array, pans: Array, volume: float) -> void:
 			pan.pan = pans[i]
 			AudioServer.add_bus_effect(idx, pan)
 		var p := AudioStreamPlayer.new()
-		p.stream = Synth.wav(loops[i], true)
+		p.stream = loops[i]
 		p.bus = bus_name
 		p.volume_db = -80.0
 		add_child(p)

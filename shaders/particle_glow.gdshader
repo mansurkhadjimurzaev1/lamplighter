@@ -4,6 +4,7 @@ render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabl
 
 uniform float intensity = 3.0;
 uniform float softness = 1.0; // 1 — мягкое пятно, 0 — резкая точка
+uniform vec3 tint = vec3(1.0);
 
 void vertex() {
 	MODELVIEW_MATRIX = VIEW_MATRIX * mat4(INV_VIEW_MATRIX[0], INV_VIEW_MATRIX[1], INV_VIEW_MATRIX[2], MODEL_MATRIX[3]);
@@ -14,6 +15,6 @@ void fragment() {
 	float d = length(UV - 0.5) * 2.0;
 	float m = 1.0 - smoothstep(0.0, 1.0, d);
 	m = mix(step(d, 0.5), m * m, softness);
-	ALBEDO = COLOR.rgb * intensity * m;
+	ALBEDO = COLOR.rgb * tint * intensity * m;
 	ALPHA = COLOR.a * m;
 }

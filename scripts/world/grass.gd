@@ -25,16 +25,12 @@ func build(per_m2: float) -> void:
 
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/grass.gdshader")
-	mat.set_shader_parameter("height_map", Terrain.height_tex)
-	mat.set_shader_parameter("weight_map", Terrain.weight_tex)
-	mat.set_shader_parameter("map_size", Terrain.SIZE)
-	mat.set_shader_parameter("map_res", float(Terrain.SEGS + 1))
+	Terrain.apply_map(mat)
 
-	var half := Terrain.ISLAND_RADIUS + 8.0
-	var x := -half
-	while x < half:
-		var z := -half
-		while z < half:
+	var x := Terrain.MIN.x
+	while x < Terrain.MAX.x:
+		var z := Terrain.MIN.y
+		while z < Terrain.MAX.y:
 			# пропускаем квадраты, где вообще нет суши
 			if _has_land(x, z):
 				var mmi := MultiMeshInstance3D.new()

@@ -1,12 +1,12 @@
 // Общий код: чтение карты высот/весов острова по мировым координатам.
 uniform sampler2D height_map : filter_linear, repeat_disable;
 uniform sampler2D weight_map : filter_linear, repeat_disable;
-uniform float map_size = 140.0; // метров
-uniform float map_res = 257.0; // пикселей
+uniform vec2 map_min = vec2(-62.0, -116.0); // угол карты мира (м)
+uniform float map_step = 0.6; // метров на пиксель
+uniform vec2 map_res = vec2(208.0, 288.0); // пикселей
 
 vec2 map_uv(vec2 xz) {
-	float stp = map_size / (map_res - 1.0);
-	return ((xz + map_size * 0.5) / stp + 0.5) / map_res;
+	return ((xz - map_min) / map_step + 0.5) / map_res;
 }
 
 float hash12(vec2 p) {

@@ -1,9 +1,10 @@
 // Финальная обработка кадра: сине-янтарная цветокоррекция, виньетка, плёночное зерно, затемнение.
 shader_type canvas_item;
 
-uniform sampler2D screen_tex : hint_screen_texture, filter_linear_mipmap;
+uniform sampler2D screen_tex : hint_screen_texture, filter_linear;
 uniform float fade = 0.0;
 uniform float dawn = 0.0; // 0 — ночь под Пеленой, 1 — ожившая область вокруг героя
+uniform float frost = 0.0; // холод: иней ползёт с краёв экрана
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
@@ -24,6 +25,18 @@ void fragment() {
 	q.x *= SCREEN_PIXEL_SIZE.y / SCREEN_PIXEL_SIZE.x;
 	float vig = 1.0 - smoothstep(0.25, 1.05, length(q));
 	c *= mix(mix(0.25, 0.6, dawn), 1.0, vig);
+	// иней: голубоватые кристаллы с краёв, чем холоднее — тем ближе к центру
+	if (frost > 0.001) {
+		// узор инея: «перистые» языки по краям (плавные синусы, без пиксельного шума)
+		float edge = length(q * vec2(0.8, 1.0));
+		float a = atan(q.y, q.x);
+		float feather = 0.06 * sin(a * 9.0 + 1.3) + 0.04 * sin(a * 23.0 + 0.7) + 0.025 * sin(a * 47.0 + edge * 30.0);
+		float f = smoothstep(0.78 - frost * 0.42, 0.98 - frost * 0.38, edge + feather);
+		float sparkle = pow(max(0.0, sin(SCREEN_UV.x * 340.0 + SCREEN_UV.y * 190.0) * sin(SCREEN_UV.y * 410.0 - SCREEN_UV.x * 150.0)), 12.0);
+		vec3 ice = vec3(0.78, 0.87, 0.97) * (0.55 + 0.45 * l) + sparkle * 0.25;
+		c = mix(c, ice, f * frost * 0.8);
+		c = mix(c, vec3(dot(c, vec3(0.33))) * vec3(0.88, 0.94, 1.05), frost * 0.2);
+	}
 	// зерно
 	float g = hash(SCREEN_UV / SCREEN_PIXEL_SIZE + fract(TIME * 7.13) * 100.0) - 0.5;
 	c += g * 0.035 * (1.0 - l * 0.6);

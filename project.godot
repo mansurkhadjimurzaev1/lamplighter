@@ -15,8 +15,12 @@ config/icon="res://assets/icon.svg"
 
 [display]
 
-window/size/viewport_width=1600
-window/size/viewport_height=900
+window/size/viewport_width=1440
+window/size/viewport_height=810
+window/size/window_width_override=1600
+window/size/window_height_override=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 window/vsync/vsync_mode=1
 window/handheld/orientation=6
 
@@ -68,4 +72,8 @@ beacon_4={
 beacon_wave={
 "type": "vec4",
 "value": Vector4(0, 0, 0, -1)
+}
+wind_strength={
+"type": "float",
+"value": 1.0
 }

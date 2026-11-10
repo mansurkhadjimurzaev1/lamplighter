@@ -11,10 +11,10 @@ var _sparkle: GPUParticles3D
 var _t := 0.0
 
 
-func build(count: int, colliders: Array[Vector3], avoid: Array[Vector3], taken: Array) -> void:
-	name = "OilFlasks"
+## area: центр и радиус области; index_base — номера флаконов этой области (для сохранения)
+func build(count: int, colliders: Array[Vector3], avoid: Array[Vector3], taken: Array, area := Vector3(0, 0, 36), index_base := 0, min_h := 0.5) -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 77
+	rng.seed = 77 + index_base
 	var glass := StandardMaterial3D.new()
 	glass.albedo_color = Color(0.85, 0.9, 1.0, 0.35)
 	glass.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -35,11 +35,11 @@ func build(count: int, colliders: Array[Vector3], avoid: Array[Vector3], taken: 
 	while i < count and tries < 4000:
 		tries += 1
 		var a := rng.randf() * TAU
-		var d := sqrt(rng.randf()) * (Terrain.ISLAND_RADIUS - 4.0)
-		var x := cos(a) * d
-		var z := sin(a) * d
+		var d := sqrt(rng.randf()) * area.z
+		var x := area.x + cos(a) * d
+		var z := area.y + sin(a) * d
 		var h := Terrain.height_at(x, z)
-		if h < 0.5 or Vector2(x, z - 4.0).length() < 7.0:
+		if h < min_h or not Hero.can_stand(x, z) or SwampLayout.bog_at(x, z) > 0.0:
 			continue
 		var ok := true
 		for c in colliders + avoid:
@@ -67,9 +67,9 @@ func build(count: int, colliders: Array[Vector3], avoid: Array[Vector3], taken: 
 		(halo.process_material as ParticleProcessMaterial).gravity = Vector3(0, 0.25, 0)
 		halo.position = Vector3.ZERO
 		node.add_child(halo)
-		var taken_already := taken.has(i)
+		var taken_already := taken.has(i + index_base)
 		node.visible = not taken_already
-		_items.append({node = node, index = i, base_y = h + 0.35, taken = taken_already})
+		_items.append({node = node, index = i + index_base, base_y = h + 0.35, taken = taken_already})
 		i += 1
 
 	_sparkle = Fx.burst(40, 2.5)

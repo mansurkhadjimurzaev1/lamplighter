@@ -4,6 +4,7 @@ extends CanvasLayer
 ## и подсказка действия («зажечь маяк»).
 
 signal action_pressed
+signal journal_pressed
 
 var oil := 1.0
 var _flask := FlaskIcon.new()
@@ -11,6 +12,10 @@ var _prompt: Button
 var _prompt_alpha := 0.0
 var _prompt_want := false
 var _touch := false
+var show_flask := true
+var _toasts: Array = [] # очередь уведомлений
+var _toast: Label
+var _toast_t := 0.0
 
 
 class FlaskIcon extends Control:
@@ -78,6 +83,36 @@ func build() -> void:
 	_prompt.modulate.a = 0.0
 	add_child(_prompt)
 
+	_toast = Label.new()
+	_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_toast.offset_top = 22
+	_toast.offset_left = -360
+	_toast.offset_right = 360
+	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_toast.add_theme_font_override("font", font)
+	_toast.add_theme_font_size_override("font_size", 21)
+	_toast.add_theme_color_override("font_color", Color(1.0, 0.88, 0.66))
+	_toast.add_theme_color_override("font_outline_color", Color(0.04, 0.03, 0.06, 0.9))
+	_toast.add_theme_constant_override("outline_size", 6)
+	_toast.modulate.a = 0.0
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_toast)
+
+	if _touch:
+		var jb := Button.new()
+		jb.text = "Журнал"
+		jb.focus_mode = Control.FOCUS_NONE
+		jb.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		jb.offset_left = -130
+		jb.offset_top = 14
+		jb.offset_right = -14
+		jb.offset_bottom = 56
+		jb.add_theme_font_override("font", font)
+		jb.add_theme_font_size_override("font_size", 20)
+		jb.pressed.connect(func(): journal_pressed.emit())
+		add_child(jb)
+
 
 func show_prompt(text_pc: String, text_touch: String, on: bool) -> void:
 	_prompt_want = on
@@ -85,8 +120,19 @@ func show_prompt(text_pc: String, text_touch: String, on: bool) -> void:
 		_prompt.text = text_touch if _touch else text_pc
 
 
+func toast(text: String) -> void:
+	_toasts.append(text)
+
+
 func _process(dt: float) -> void:
 	_flask.level = oil
+	_flask.visible = show_flask
+	# уведомления по очереди: появиться, подержаться, исчезнуть
+	_toast_t -= dt
+	if _toast_t <= 0.0 and _toasts.size() > 0:
+		_toast.text = _toasts.pop_front()
+		_toast_t = 3.6
+	_toast.modulate.a = clampf(minf(3.6 - _toast_t, _toast_t) * 2.0, 0.0, 1.0) if _toast_t > 0.0 else 0.0
 	_prompt_alpha = move_toward(_prompt_alpha, 1.0 if _prompt_want else 0.0, dt * 3.0)
 	_prompt.modulate.a = _prompt_alpha * (0.8 + 0.2 * sin(Time.get_ticks_msec() * 0.003))
 	_prompt.visible = _prompt_alpha > 0.01

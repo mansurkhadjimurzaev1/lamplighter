@@ -18,8 +18,9 @@ var _raise := 0.0 # 0 — висит в руке, 1 — поднят
 var _fill: OmniLight3D
 var _dip := 0.0 # внезапные «провалы» пламени при малом масле
 var _dip_timer := 0.0
-const BASE_ENERGY := 4.5
-const BASE_RANGE := 14.0
+var BASE_ENERGY := 4.5
+var BASE_RANGE := 14.0
+var carried := true
 
 
 func build(shadows: bool) -> void:
@@ -158,6 +159,19 @@ func update_lantern(dt: float, pivot_world: Vector3, oil := 1.0, raised := false
 	_flame.scale = Vector3(1.0 + fast * 0.15, 1.9 + fast * 0.5 + slow * 0.2, 1.0 + fast * 0.15) * fs * (1.0 + 0.2 * lift)
 	_flame_mat.emission_energy_multiplier = 12.0 * f * amount * (1.0 + 0.5 * lift)
 	light.position = Vector3(fast * 0.006, -0.24 + slow * 0.005, _noise.get_noise_2d(_t * 11.0, 2.0) * 0.006)
+
+
+## Фонарь в руке или ещё нет (до разговора с Ольдрихом)
+func set_carried(on: bool) -> void:
+	carried = on
+	visible = on
+
+
+## Улучшение у кузнеца: свет ярче и шире, фонарь чуть крупнее
+func upgrade() -> void:
+	BASE_ENERGY = 5.4
+	BASE_RANGE = 16.5
+	_body.scale = Vector3.ONE * 1.12
 
 
 func light_world_position() -> Vector3:

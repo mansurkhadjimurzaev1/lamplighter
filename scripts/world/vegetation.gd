@@ -15,6 +15,28 @@ var exclusions: Array[Vector3] = []
 var _rng := RandomNumberGenerator.new()
 var _forest := FastNoiseLite.new()
 var _rock_tex: Texture2D
+var _models := {}
+## Занятые места: сетка 4×4 м → список Vector3(x, z, радиус) — быстрая проверка соседей
+var _grid := {}
+const GRID := 4.0
+
+
+func _occupied(x: float, z: float, r: float) -> bool:
+	var cx := floori(x / GRID)
+	var cz := floori(z / GRID)
+	for i in range(cx - 1, cx + 2):
+		for j in range(cz - 1, cz + 2):
+			for c in _grid.get(Vector2i(i, j), []):
+				if Vector2(c.x - x, c.y - z).length() < c.z + r:
+					return true
+	return false
+
+
+func _occupy(x: float, z: float, r: float) -> void:
+	var key := Vector2i(floori(x / GRID), floori(z / GRID))
+	if not _grid.has(key):
+		_grid[key] = []
+	_grid[key].append(Vector3(x, z, r))
 
 
 func _forest_density(x: float, z: float) -> float:
@@ -117,8 +139,7 @@ func build(cast_shadows: bool) -> void:
 	_forest.fractal_octaves = 3
 	_rock_tex = load("res://assets/textures/ground/Rock030_color.jpg")
 
-	var models := {}
-	var occupied: Array[Vector3] = []
+	var models := _models
 	for kind in _kinds():
 		for f in kind.files:
 			if not models.has(f):
@@ -148,13 +169,9 @@ func build(cast_shadows: bool) -> void:
 			for ex in exclusions:
 				if Vector2(ex.x - x, ex.y - z).length() < ex.z:
 					blocked = true
-			for c in occupied:
-				if Vector2(c.x - x, c.y - z).length() < c.z + radius:
-					blocked = true
-					break
-			if blocked:
+			if blocked or ForestLayout.region_factor(x, z) > 0.3 or ForestLayout.trail_dist(x, z) < 1.8 or _occupied(x, z, radius):
 				continue
-			occupied.append(Vector3(x, z, radius))
+			_occupy(x, z, radius)
 			if collide > 0.0:
 				colliders.append(Vector3(x, z, radius))
 
@@ -309,3 +326,189 @@ func _center_arrays() -> PackedVector3Array:
 		var a1 := (i + 1) * TAU / 6.0
 		a.append_array([c + Vector3(0, 0.03, 0), c + Vector3(cos(a1), 0, sin(a1)) * 0.07, c + Vector3(cos(a0), 0, sin(a0)) * 0.07])
 	return a
+
+
+
+## Шепчущий лес: высокие ели стеной, подлесок, папоротники, валежник, замшелые камни.
+## Тропы и поляны свободны. Деревья в глубине леса — без препятствий для героя
+## (там и так можно ходить только по тропам), на опушке — с препятствиями.
+func build_forest(cast_shadows: bool) -> void:
+	var c := ForestLayout.CENTER
+	var R := ForestLayout.RADIUS + 3.0
+	var kinds := [
+		{files = ["PineTree_1", "PineTree_2", "PineTree_3", "PineTree_4", "PineTree_5"], h = [7.0, 11.0], count = 620, collide = 0.07, gap = 1.6, shadow = true},
+		{files = ["CommonTree_1", "CommonTree_3", "CommonTree_4"], h = [6.0, 9.0], count = 50, collide = 0.07, gap = 1.6, shadow = true},
+		{files = ["CommonTree_Dead_1", "BirchTree_Dead_2", "CommonTree_Dead_3"], h = [5.0, 8.0], count = 30, collide = 0.06, gap = 1.4, shadow = true},
+		{files = ["Rock_Moss_1", "Rock_Moss_2", "Rock_Moss_4", "Rock_Moss_6"], h = [0.6, 2.0], count = 90, collide = 0.35, gap = 0.4, sink = 0.15, tilt = 0.3, shadow = true},
+		{files = ["TreeStump_Moss", "WoodLog_Moss"], h = [0.5, 0.9], count = 70, collide = 0.3, gap = 0.4, sink = 0.05, shadow = true},
+		{files = ["Bush_1", "Bush_2"], h = [0.8, 1.6], count = 420, collide = 0.0, gap = 0.6, sink = 0.05, shadow = false},
+		{files = ["Plant_1", "Plant_2", "Plant_3", "Plant_5"], h = [0.5, 1.1], count = 700, collide = 0.0, gap = 0.15, shadow = false},
+	]
+	_rng.seed = 777
+	for kind in kinds:
+		for f in kind.files:
+			if not _models.has(f):
+				_models[f] = _load_model(f)
+		var buckets := {}
+		var placed := 0
+		var attempts := 0
+		while placed < kind.count and attempts < kind.count * 25:
+			attempts += 1
+			var a := _rng.randf() * TAU
+			var d := sqrt(_rng.randf()) * R
+			var x := c.x + cos(a) * d
+			var z := c.y + sin(a) * d
+			var h := Terrain.height_at(x, z)
+			if h < Terrain.WATER_LEVEL + 0.3:
+				continue
+			# у троп и на полянах — пусто; папоротники можно ближе к краю тропы
+			if ForestLayout.path_dist(x, z) < kind.gap or ForestLayout.trail_dist(x, z) < 1.8:
+				continue
+			var file: String = kind.files[_rng.randi() % kind.files.size()]
+			var model: Dictionary = _models[file]
+			var height: float = lerpf(kind.h[0], kind.h[1], _rng.randf())
+			var collide: float = kind.collide
+			var radius := maxf(0.25, model.width * height * (collide if collide > 0.0 else 0.12))
+			if collide > 0.0 and _occupied(x, z, radius):
+				continue
+			if collide > 0.0:
+				_occupy(x, z, radius)
+				if not ForestLayout.in_core(x, z):
+					colliders.append(Vector3(x, z, radius))
+			var tilt: float = kind.get("tilt", 0.12)
+			var n := Terrain.normal_at(x, z)
+			var b := Basis(Quaternion(Vector3.UP, (Vector3.UP + n * tilt).normalized()))
+			b = b * Basis(Vector3.UP, _rng.randf() * TAU)
+			var s := height * _rng.randf_range(0.9, 1.1)
+			b = b.scaled(Vector3(s * _rng.randf_range(0.85, 1.15), s, s * _rng.randf_range(0.85, 1.15)))
+			var sink: float = kind.get("sink", 0.06)
+			var base_y := h - sink * height
+			# тени отбрасывают только деревья у троп — в глубине чащи их тени всё равно не видны
+			var casts: bool = kind.shadow and ForestLayout.path_dist(x, z) < 4.5
+			var key := "%s|%d:%d|%s" % [file, floori(x / CHUNK), floori(z / CHUNK), casts]
+			if not buckets.has(key):
+				buckets[key] = {file = file, items = [], casts = casts}
+			buckets[key].items.append([Transform3D(b, Vector3(x, base_y, z)), Color(base_y, s, _rng.randf(), 0.0)])
+			placed += 1
+		for key in buckets:
+			var bucket: Dictionary = buckets[key]
+			for part in _models[bucket.file].parts:
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.use_custom_data = true
+				mm.mesh = part.mesh
+				mm.instance_count = bucket.items.size()
+				for i in bucket.items.size():
+					mm.set_instance_transform(i, bucket.items[i][0] * part.xf)
+					mm.set_instance_custom_data(i, bucket.items[i][1])
+				var mmi := MultiMeshInstance3D.new()
+				mmi.multimesh = mm
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and bucket.casts) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mmi.visibility_range_end = 70.0
+				add_child(mmi)
+
+
+
+## Топь: мёртвые ивы и деревья на кочках, полузатопленные брёвна, кувшинки на мелководье.
+## Цветы кувшинок распускаются, когда до них доходит оживание маяка.
+func build_swamp(cast_shadows: bool) -> void:
+	var c := SwampLayout.CENTER
+	var R := SwampLayout.RADIUS
+	_rng.seed = 919
+	var kinds := [
+		{files = ["Willow_Dead_1", "Willow_Dead_2", "Willow_Dead_3", "Willow_Dead_4", "Willow_Dead_5"], h = [4.0, 7.5], count = 70, collide = 0.06, hmin = -0.25, hmax = 2.0, shadow = true, sink = 0.04},
+		{files = ["CommonTree_Dead_2", "CommonTree_Dead_4", "BirchTree_Dead_2"], h = [3.5, 6.0], count = 30, collide = 0.06, hmin = -0.1, hmax = 2.0, shadow = true, sink = 0.04},
+		{files = ["WoodLog", "TreeStump_Moss"], h = [0.4, 0.8], count = 30, collide = 0.0, hmin = -0.6, hmax = 0.4, shadow = false, sink = 0.35, tilt = 0.4},
+		{files = ["Lilypad"], h = [0.05, 0.12], count = 420, collide = 0.0, hmin = -1.2, hmax = -0.15, shadow = false, water = true},
+	]
+	for kind in kinds:
+		for f in kind.files:
+			if not _models.has(f):
+				_models[f] = _load_model(f)
+		var buckets := {}
+		var placed := 0
+		var attempts := 0
+		while placed < kind.count and attempts < kind.count * 30:
+			attempts += 1
+			var a := _rng.randf() * TAU
+			var d := sqrt(_rng.randf()) * R
+			var x := c.x + cos(a) * d
+			var z := c.y + sin(a) * d
+			var h := Terrain.height_at(x, z)
+			if h < kind.hmin or h > kind.hmax:
+				continue
+			if SwampLayout.walk_dist(x, z) < 1.6 or Vector2(x, z).distance_to(SwampLayout.pier_a()) < 4.0 or Vector2(x, z).distance_to(SwampLayout.pier_b()) < 4.0:
+				continue
+			if Vector2(x, z).distance_to(SwampLayout.BEACON) < SwampLayout.BEACON_R + 0.5 or Vector2(x, z).distance_to(SwampLayout.HUT) < 3.5:
+				continue
+			var file: String = kind.files[_rng.randi() % kind.files.size()]
+			var model: Dictionary = _models[file]
+			var height: float = lerpf(kind.h[0], kind.h[1], _rng.randf())
+			var radius := maxf(0.3, model.width * height * (kind.collide if kind.collide > 0.0 else 0.2))
+			if kind.collide > 0.0:
+				if _occupied(x, z, radius):
+					continue
+				_occupy(x, z, radius)
+				colliders.append(Vector3(x, z, radius))
+			var b := Basis(Vector3.UP, _rng.randf() * TAU)
+			var tilt: float = kind.get("tilt", 0.0)
+			if tilt > 0.0:
+				b = b * Basis.from_euler(Vector3(_rng.randf_range(-tilt, tilt), 0, _rng.randf_range(-tilt, tilt)))
+			var s := height
+			var base_y: float = h - kind.get("sink", 0.05) * height
+			if kind.get("water", false):
+				# кувшинка: широкая и плоская, на поверхности воды
+				s = _rng.randf_range(0.7, 1.4) / maxf(model.width, 0.01) # ширина s метров, пропорции как у модели
+				b = b.scaled(Vector3(s, s, s))
+				base_y = 0.01
+			else:
+				b = b.scaled(Vector3(s, s, s))
+			var key := "%s|%d:%d" % [file, floori(x / CHUNK), floori(z / CHUNK)]
+			if not buckets.has(key):
+				buckets[key] = {file = file, items = []}
+			buckets[key].items.append([Transform3D(b, Vector3(x, base_y, z)), Color(base_y, s if not kind.get("water", false) else 0.1, x, z)])
+			placed += 1
+		for key in buckets:
+			var bucket: Dictionary = buckets[key]
+			for part in _models[bucket.file].parts:
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.use_custom_data = true
+				mm.mesh = part.mesh
+				mm.instance_count = bucket.items.size()
+				for i in bucket.items.size():
+					var xf: Transform3D = bucket.items[i][0]
+					mm.set_instance_transform(i, xf * part.xf)
+					mm.set_instance_custom_data(i, bucket.items[i][1])
+				var mmi := MultiMeshInstance3D.new()
+				mmi.multimesh = mm
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and kind.shadow) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mmi.visibility_range_end = 70.0
+				add_child(mmi)
+	# цветы кувшинок: распускаются после маяка (grow)
+	var flower := _flower_mesh(Color(0.98, 0.78, 0.86))
+	var fx: Array = []
+	var tries := 0
+	while fx.size() < 140 and tries < 5000:
+		tries += 1
+		var a := _rng.randf() * TAU
+		var d := sqrt(_rng.randf()) * R
+		var x := c.x + cos(a) * d
+		var z := c.y + sin(a) * d
+		var h := Terrain.height_at(x, z)
+		if h < -1.2 or h > -0.2 or SwampLayout.walk_dist(x, z) < 1.4:
+			continue
+		var s := _rng.randf_range(0.35, 0.5)
+		fx.append([Transform3D(Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s * 1.4, s * 0.35, s * 1.4)), Vector3(x, -0.25, z)), Color(-0.25, s, x, z)])
+	var fm := MultiMesh.new()
+	fm.transform_format = MultiMesh.TRANSFORM_3D
+	fm.use_custom_data = true
+	fm.mesh = flower
+	fm.instance_count = fx.size()
+	for i in fx.size():
+		fm.set_instance_transform(i, fx[i][0])
+		fm.set_instance_custom_data(i, fx[i][1])
+	var fmi := MultiMeshInstance3D.new()
+	fmi.multimesh = fm
+	fmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(fmi)

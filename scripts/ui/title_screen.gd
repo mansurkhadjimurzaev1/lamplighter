@@ -9,6 +9,7 @@ var _root := Control.new()
 var _hint: Label
 var _ready_to_start := false
 var _done := false
+var _want_new := false # N нажали, пока мир ещё загружался
 var _t := 0.0
 
 
@@ -50,7 +51,7 @@ func build() -> void:
 	_hint = _label("Коснитесь, чтобы начать" if touch else "Нажмите любую клавишу", font, 20, Color(0.95, 0.84, 0.65, 0.0))
 	box.add_child(_hint)
 
-	var ctl := "Тап — идти  ·  долгое касание — поднять фонарь" if touch else "WASD / клик — идти  ·  пробел — поднять фонарь  ·  E — зажечь маяк  ·  F — fps  ·  Esc — выход"
+	var ctl := "Тап — идти  ·  долгое касание — поднять фонарь" if touch else "WASD / клик — идти  ·  пробел — поднять фонарь  ·  E — зажечь маяк  ·  F — fps  ·  Esc — меню"
 	if SaveGame.has_save() and not touch:
 		ctl += "\nN — начать заново"
 	var controls := _label(ctl, font, 15, Color(0.95, 0.84, 0.65, 0.45))
@@ -72,6 +73,9 @@ func _label(text: String, font: Font, size: int, color: Color) -> Label:
 
 func set_ready() -> void:
 	_ready_to_start = true
+	if _want_new:
+		_done = true
+		new_game.emit.call_deferred()
 
 
 func _process(dt: float) -> void:
@@ -86,14 +90,21 @@ func _process(dt: float) -> void:
 
 
 func _input(e: InputEvent) -> void:
-	if not _ready_to_start or _done:
+	if _done:
+		return
+	if e is InputEventKey and e.pressed and not e.echo and e.physical_keycode == KEY_N and SaveGame.has_save():
+		get_viewport().set_input_as_handled()
+		if not _ready_to_start:
+			_want_new = true # сработает, как только мир загрузится
+			_hint.text = "Начинаем заново…"
+			_hint.modulate.a = 1.0
+			return
+		_done = true
+		new_game.emit.call_deferred()
+		return
+	if not _ready_to_start:
 		return
 	var pressed: bool = (e is InputEventKey and e.pressed) or (e is InputEventMouseButton and e.pressed) or (e is InputEventScreenTouch and e.pressed)
-	if e is InputEventKey and e.pressed and e.physical_keycode == KEY_N and SaveGame.has_save():
-		_done = true
-		new_game.emit()
-		get_viewport().set_input_as_handled()
-		return
 	if pressed:
 		start()
 		get_viewport().set_input_as_handled()

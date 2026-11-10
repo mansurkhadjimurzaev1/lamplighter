@@ -31,7 +31,73 @@
   Тестовые аргументы: `--newgame` (игнорировать сохранение), `--nosave`, `--shadetest`.
   ВАЖНО: автотест без `--nosave` записывает сохранение — после проверок удалять
   `~/Library/Application Support/Godot/app_userdata/Lamplighter/save.json`.
+- Деревня (этап 3): планировка — scripts/world/village_layout.gd (всё в локальных координатах от площади,
+  земля выровнена, брусчатка = альфа-канал цвета вершин земли); постройки — village.gd + props.gd
+  (материалы Quaternius → foliage.gdshader: Stone→камень, Wood→волокна, Windows→тёплый свет).
+  Жители — scripts/npc/villager.gd (KayKit без оружия/шлемов, перекраска npc.gdshader по цветам палитры:
+  цвета брать из tools/palette.gd). Конфиг жителей — NPCS в main.gd.
+- Диалоги и сюжет — ДАННЫЕ, правятся без кода: data/dialogues/<id>.json, data/quests.json, items.json, notes.json.
+  Узел: text (строка или страницы), alt {if,text}, do [действия], next | choices [{text, if, do, next}],
+  choices_from "trinkets" + pick_next. Условия: flag:x, !flag:x, item:x, quest:id=active|done, quest:id!=done,
+  trinkets, «a & b». Действия: flag:x, quest:id=state, give:x, take:x / take:$sel, note:id, oil:0.5,
+  upgrade_lantern, save. Логика — scripts/story/game_state.gd, dialogue_runner.gd.
+- Взаимодействия «E — …» — список interactables в main.gd. Журнал — J. Тесты: `--storytest`, `--npctest`,
+  `--villagetest --bright --zoom=1.8`. Отладка: `--skip_village`, `--skip_npcs`, `--skip_vsound`.
+- Звуки деревни долго синтезируются — кэшируются в user://cache (Synth.cached; при изменении синтеза
+  повысить Synth.CACHE_VERSION).
+- Мир (этап 4А): прямоугольник Terrain.MIN..MAX (124×172 м), суша = остров с деревней (центр 0,0, r 40)
+  + лесной массив (ForestLayout.CENTER, r 38), Terrain.land_mask(). Карта высот/весов для шейдеров —
+  Terrain.apply_map(mat) (параметры map_min/map_step/map_res). Север = −z.
+- Шепчущий лес: scripts/world/forest_layout.gd — граф троп N/EDGES (петли!), верный путь ROUTE,
+  поляны GLADES; в глубине (CORE) ходить можно только по тропам — ForestLayout.walkable().
+  forest.gd — грибы, лунные лучи (beam.gdshader), светлячки-проводники (guide.gdshader), хижина Вейла.
+  Лес сажает vegetation.build_forest() (деревья в глубине — без коллайдеров, их заменяет walkable).
+  Маяк леса — beacons[1] (индекс 1), в RegionAudio область "forest". Тесты: `--foresttest`, `--forestlook`,
+  `--bench --at=forest`.
+- Новые маяки: добавлять в main._build_world (Beacon.build(index, pos, tex, радиус)), задание закрывается
+  в main._light() по индексу маяка; global uniform beacon_0..4 — максимум 5 маяков.
+- Карта: scripts/ui/map_data.gd (мир рисуется «от руки» из Terrain.height_img/info_img + туман
+  неизведанного 2 м/клетка, сохраняется в save.json → "explored"), scripts/ui/minimap.gd (круг в углу,
+  повёрнут как камера; M — большая карта), shaders/map.gdshader. Метки ставит main._update_map():
+  маяки, жители с новостями, цели заданий — пунктирный круг «где-то здесь» / указатель на краю.
+  Точный путь в лесу карта НЕ показывает — только пройденное.
+- Топь (этап 4Б): scripts/world/swamp_layout.gd — центр (74,−12) r 36, Terrain.MAX.x = 116.
+  Мелководье (h > −0.9) — брести можно, масло ×2.5; омуты глубже — нельзя; трясины BOGS — затягивают
+  (main._update_bog → обморок через 5 с); мостки WALK/WALK2 (SwampLayout.on_boardwalk, deck_height);
+  островок маяка за протокой — только лодкой (main._ferry_start, State.FERRY, swamp.gd лодка).
+  Проходимость героя — Hero.can_stand() (лес + топь + берег). swamp.gd: вода (swamp_water.gdshader,
+  непрозрачная, ReflectionProbe), камыши, дымка (mist.gdshader), блуждающие огни (видны и на мини-карте
+  как огонёк без башни), хижина, лодка, стрекозы. Маяк топи — beacons[2], BEACON_QUESTS в main.gd.
+  Паромщик Корней (ferryman) стоит в лодке. Тесты: `--swamptest`, `--wisplook`, `--bench --at=swamp`.
+- Горы (этап 4В): scripts/world/mountain_layout.gd — центр (−78,2) r 38, вершина 15 м, Terrain.MIN.x = −122.
+  Лестница STAIRS (серпантин) + гребень RIDGE к утёсу маяка; в глубине гор (CORE) — только по ним и площадкам.
+  Перешеек от деревни к горам насыпается в Terrain.raw_height. mountains.gd: ступени со снегом, жаровни
+  (E — разжечь, флаги brazier_N), обсерватория (башня, медный купол и телескоп, астролябии,
+  star_chart.gdshader, книги), снегопад (snow.gdshader). Холод — main._update_cold (иней: grade «frost»,
+  гасит свет фонаря, масло ×(1+2·холод), 1.0 → обморок). Ветер — global uniform wind_strength.
+  Маяк гор — beacons[3]. Учёный Ансар раскрывает правду: советник Морн, серебряные рудники, подземный
+  пожар в угольном пласте кормит Пелену; король горевал по королеве и поверил. Флаг knows_truth.
+  Тесты: `--mountaintest`, `--mtnlook`, `--bench --at=mountain`.
+- Руины замка (этап 4Г): scripts/world/castle_layout.gd — островок (0,94) r 30 к югу, Terrain.MAX.y = 126;
+  каменный мост от южного берега (bridge_start ищется в setup) к воротам (0,72); решётка закрыта, пока
+  не горят маяки 0–3 (CastleLayout.gate_open, main._update_castle). castle.gd: стены (stone.gdshader с
+  fade_near — растворяются перед героем), двор, тронный зал: вход с ЮГА, трон у северной стены — король
+  смотрит в камеру. Фрески (fresco.gdshader, E → запись в журнал), гобелены (tapestry.gdshader).
+  Абсолютная тьма — Atmosphere castle-фактор + луна гаснет. Тени замка — второй Shades(castle_mode):
+  модели рыцаря/варвара, ×1.5 скорость, ×2.2 стойкость. Обморок в замке → пробуждение у начала моста.
+  Пятый маяк beacons[4] во дворе: зажечь нельзя, пока нет флага castle_final_ready (этап 5).
+  Король: NPC "king", поза Sit_Chair_Idle, корона (villager._add_crown), диалог-заготовка data/dialogues/king.json.
+  Тесты: `--castletest`, `--kinglook`, `--bench --at=castle`.
 - Подводные камни Godot, на которые уже наступали:
+  - `flat` — зарезервированное слово в шейдерах Godot, не называть так переменные.
+  - После добавления НОВОГО файла с class_name — сначала `Godot --headless --path . --import`, иначе
+    main.gd не загрузится, а окно игры повиснет (в macOS нет команды `timeout`).
+  - Тесты, которые трогают сохранение (`--presstest`, `--earlyN`, `--pausetest`), гонять только на копии:
+    сохранить save.json автора и вернуть после.
+  - НЕ делать узор `sin(x)*sin(z)` — на экране это шахматная доска (так было с бликом на воде).
+  - Интерфейс масштабируется сам: display/window/stretch canvas_items, база 1440×810.
+  - НЕ хранить Callable/лямбды узлов в static-переменных до выхода — падение при закрытии
+    («recursive_mutex lock failed»). Очищать в main._exit_tree() (GameState.hooks и кэши).
   - Размер модели считать по рамке с учётом global_transform (у KayKit внутри свой масштаб).
   - Цвет в `uniform vec3 x : source_color` передавать как `Color`, не `Vector3` (иначе цвет не применяется).
   - Вектор в функцию передаётся копией — возвращать результат.

@@ -5,33 +5,57 @@ extends Node3D
 var list: Array[Shade] = []
 var _rng := RandomNumberGenerator.new()
 var sound: Soundscape
+## Тени замка: появляются только внутри стен, когда герой в замке
+var castle := false
 
 
-func build(count: int) -> void:
-	name = "Shades"
-	_rng.seed = 404
+func build(count: int, castle_mode := false) -> void:
+	castle = castle_mode
+	name = "CastleShades" if castle else "Shades"
+	_rng.seed = 404 if not castle else 505
 	var scene: PackedScene = load("res://assets/models/hero/Rogue_Hooded.glb")
+	var human: Array[PackedScene] = [load("res://assets/models/people/KK_Knight.glb"), load("res://assets/models/people/KK_Barbarian.glb")]
 	for i in count:
 		var s := Shade.new()
 		add_child(s)
-		s.build(scene, _rng)
+		if castle:
+			# похожи на людей: стражники и придворные — выше, плотнее, сильнее
+			s.build(human[i % 2], _rng, 1.95, Villager.PROPS + ["Knight_Helmet", "Barbarian_Hat"])
+			s.speed_mult = 1.5
+			s.toughness = 2.2
+		else:
+			s.build(scene, _rng)
 		s.visible = false
 		s.state = Shade.State.GONE
 		s.respawn_in = 2.0 + i * 1.5
 
 
 func _spawn_point(hero: Vector3) -> Variant:
+	if castle:
+		if CastleLayout.region_factor(hero.x, hero.z) < 0.5:
+			return null
+		for i in 60:
+			var c := CastleLayout.CENTER
+			var a := _rng.randf() * TAU
+			var d := sqrt(_rng.randf()) * (CastleLayout.WALL_R - 2.0)
+			var p := Vector3(c.x + cos(a) * d, 0, c.y + sin(a) * d)
+			var dh := Vector2(p.x - hero.x, p.z - hero.z).length()
+			if dh < 8.0 or dh > 22.0 or not Hero.can_stand(p.x, p.z):
+				continue
+			p.y = Terrain.height_at(p.x, p.z)
+			return p
+		return null
 	for i in 60:
 		var a := _rng.randf() * TAU
-		var d := sqrt(_rng.randf()) * (Terrain.ISLAND_RADIUS - 3.0)
-		var p := Vector3(cos(a) * d, 0, sin(a) * d)
+		var d := _rng.randf_range(17.0, 34.0)
+		var p := Vector3(hero.x + cos(a) * d, 0, hero.z + sin(a) * d)
 		p.y = Terrain.height_at(p.x, p.z)
-		if p.y < 0.4:
+		if p.y < 0.4 or not Hero.can_stand(p.x, p.z) or CastleLayout.region_factor(p.x, p.z) > 0.0:
 			continue
 		var dh := Vector2(p.x - hero.x, p.z - hero.z).length()
 		if dh < 17.0 or dh > 34.0:
 			continue
-		if Beacon.restore_at(p) > 0.0:
+		if Beacon.restore_at(p) > 0.0 or VillageLayout.in_village(p.x, p.z, 6.0):
 			continue
 		return p
 	return null

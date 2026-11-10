@@ -158,3 +158,35 @@ static func smoke_burst() -> GPUParticles3D:
 	p.explosiveness = 0.85
 	p.emitting = false
 	return p
+
+
+## Дым из печной трубы: светлый, медленно поднимается и тает
+static func chimney_smoke() -> GPUParticles3D:
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.12
+	pm.direction = Vector3.UP
+	pm.spread = 10.0
+	pm.initial_velocity_min = 0.35
+	pm.initial_velocity_max = 0.6
+	pm.gravity = Vector3(0.18, 0.12, 0.05) # лёгкий ветер
+	pm.scale_min = 0.6
+	pm.scale_max = 1.0
+	pm.scale_curve = _curve([[0.0, 0.3], [1.0, 2.2]])
+	pm.color_ramp = _gradient([[0.0, Color(0.5, 0, 0, 0.0)], [0.15, Color(0.6, 0, 0, 0.35)], [1.0, Color(0.9, 0, 0, 0.0)]])
+	var p := _particles(26, 6.0, pm, 0.9, "res://shaders/particle_smoke.gdshader")
+	var mat: ShaderMaterial = (p.draw_pass_1 as QuadMesh).material
+	mat.set_shader_parameter("smoke_color", Vector3(0.32, 0.31, 0.33))
+	mat.set_shader_parameter("density", 0.6)
+	return p
+
+
+## Пар над самоваром
+static func steam() -> GPUParticles3D:
+	var p := chimney_smoke()
+	p.amount = 10
+	p.lifetime = 2.5
+	(p.process_material as ParticleProcessMaterial).initial_velocity_max = 0.3
+	(p.draw_pass_1 as QuadMesh).size = Vector2(0.25, 0.25)
+	((p.draw_pass_1 as QuadMesh).material as ShaderMaterial).set_shader_parameter("smoke_color", Vector3(0.75, 0.72, 0.7))
+	return p

@@ -22,6 +22,8 @@ var started := false
 var calm := 0.0
 ## 0..1 — громкость фитиля (зависит от масла)
 var wick := 1.0
+## 0..1 — насколько герой в горах (ледяной ветер)
+var mountain := 0.0
 
 
 func build() -> void:
@@ -38,7 +40,7 @@ func build() -> void:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
 		_pool.append(p)
-	for s in ["grass", "dirt", "rock", "water"]:
+	for s in ["grass", "dirt", "rock", "water", "wood"]:
 		var arr: Array[AudioStreamWAV] = []
 		for v in 5:
 			arr.append(Synth.wav(_make_step(s), false))
@@ -102,6 +104,8 @@ func _make_step(surface: String) -> PackedFloat32Array:
 			return Synth.mix(Synth.burst(0.08 * v, "lp", 380.0 * v, 0.8, 2.6, 0.004), Synth.burst(0.06, "bp", 1700.0 * v, 1.2, 0.5, 0.01))
 		"rock":
 			return Synth.mix(Synth.burst(0.03 * v, "bp", 2400.0 * v, 2.5, 1.6, 0.002), Synth.burst(0.05, "lp", 260.0, 0.7, 2.4, 0.002))
+		"wood": # гулкий шаг по доскам, с лёгким скрипом
+			return Synth.mix(Synth.burst(0.06 * v, "bp", 520.0 * v, 2.5, 2.0, 0.002), Synth.burst(0.1, "lp", 170.0, 0.9, 2.0, 0.002))
 		_:
 			return Synth.mix(Synth.burst(0.22 * v, "bp", 600.0, 1.5, 1.4, 0.02, 2200.0), Synth.burst(0.12, "lp", 300.0, 0.7, 1.4, 0.01))
 
@@ -130,10 +134,10 @@ func update_sound(dt: float) -> void:
 	var gust := 0.5 + 0.5 * sin(t * 0.11) * sin(t * 0.047 + 1.3)
 	var g2 := maxf(0.0, sin(t * 0.07 + 2.0) * sin(t * 0.19))
 	var still := 1.0 - calm * 0.65 # в ожившей области ветер стихает
-	_wind.volume_db = linear_to_db((0.12 + gust * 0.32) * still)
+	_wind.volume_db = linear_to_db((0.12 + gust * 0.32) * still * (1.0 + mountain * 0.9))
 	(AudioServer.get_bus_effect(_wind_bus, 0) as AudioEffectBandPassFilter).cutoff_hz = 260.0 + gust * 520.0
 	(AudioServer.get_bus_effect(_wind_bus, 1) as AudioEffectPanner).pan = sin(t * 0.05) * 0.6
-	_whistle.volume_db = linear_to_db(maxf(0.0001, g2 * g2 * 0.05 * still))
+	_whistle.volume_db = linear_to_db(maxf(0.0001, (g2 * g2 * 0.05 + mountain * (0.02 + gust * 0.04)) * still))
 	(AudioServer.get_bus_effect(_whistle_bus, 0) as AudioEffectBandPassFilter).cutoff_hz = 900.0 + g2 * 700.0 + sin(t * 0.5) * 80.0
 	_hiss.volume_db = linear_to_db(maxf(0.0001, 0.012 * wick))
 	if t > _next_crackle and wick > 0.05:

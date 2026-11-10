@@ -15,6 +15,8 @@ const WAVE_TIME := 10.0 # сколько расходится волна
 static var all: Array[Beacon] = []
 
 var index := 0
+## Радиус оживания этого маяка (у маяка деревни — чтобы накрыть всю деревню)
+var max_radius := MAX_RADIUS
 var lit := false
 var radius := 0.0 # радиус ожившей области
 var wave := -1.0 # радиус фронта волны (-1 — нет волны)
@@ -37,8 +39,9 @@ var _sfx_done := false
 var sound: Soundscape
 
 
-func build(idx: int, pos: Vector3, stone_tex: Texture2D) -> void:
+func build(idx: int, pos: Vector3, stone_tex: Texture2D, area := MAX_RADIUS) -> void:
 	index = idx
+	max_radius = area
 	name = "Beacon_%d" % idx
 	position = pos
 	all.append(self)
@@ -121,7 +124,7 @@ func build(idx: int, pos: Vector3, stone_tex: Texture2D) -> void:
 	_dawn_light.visible = false
 	add_child(_dawn_light)
 
-	_pollen = Fx.pollen(MAX_RADIUS * 0.85)
+	_pollen = Fx.pollen(max_radius * 0.85)
 	_pollen.position = Vector3(0, -2.0, 0)
 	_pollen.emitting = false
 	add_child(_pollen)
@@ -201,7 +204,7 @@ func is_animating() -> bool:
 ## Уже зажжённый маяк при загрузке сохранения
 func set_lit_instant() -> void:
 	lit = true
-	radius = MAX_RADIUS
+	radius = max_radius
 	wave = -1.0
 	_ash.visible = false
 	_flames.emitting = true
@@ -210,7 +213,7 @@ func set_lit_instant() -> void:
 	_fire_light.visible = true
 	_fire_light.light_energy = 3.0
 	_dawn_light.visible = true
-	_dawn_light.omni_range = MAX_RADIUS + 3.0
+	_dawn_light.omni_range = max_radius + 3.0
 	_dawn_light.light_energy = 1.3
 
 
@@ -253,18 +256,18 @@ func _process(dt: float) -> void:
 
 	# 3) волна оживания расходится от маяка
 	if _t >= WAVE_START:
-		var w := clampf((_t - WAVE_START) / WAVE_TIME, 0.0, 1.0)
+		var w := clampf((_t - WAVE_START) / (WAVE_TIME * max_radius / MAX_RADIUS), 0.0, 1.0)
 		var eased := 1.0 - pow(1.0 - w, 2.2)
-		wave = eased * (MAX_RADIUS + 6.0)
+		wave = eased * (max_radius + 6.0)
 		radius = maxf(radius, wave)
 		_dawn_light.visible = true
-		_dawn_light.omni_range = maxf(1.0, minf(wave, MAX_RADIUS) + 3.0)
+		_dawn_light.omni_range = maxf(1.0, minf(wave, max_radius) + 3.0)
 		_dawn_light.light_energy = 1.3 * minf(1.0, w * 2.0)
 		if w > 0.15 and not _pollen.emitting:
 			_pollen.emitting = true
 		if w >= 1.0:
 			wave = -1.0
-			radius = MAX_RADIUS
+			radius = max_radius
 			_t = -1.0
 
 
@@ -306,7 +309,9 @@ static func find_hilltop(start: Vector3, min_d: float, max_d: float) -> Vector3:
 			# предпочитаем ровную вершину
 			var flat := Terrain.normal_at(x, z).y
 			var score := h + flat * 2.0
-			if score > best_h and Vector2(x, z).length() < Terrain.ISLAND_RADIUS - 8.0:
+			# маяк деревни — на холме к югу от деревни (на севере — тропа в лес)
+			var ok_place := Vector2(x, z).length() < Terrain.ISLAND_RADIUS - 8.0 and not VillageLayout.in_village(x, z, 4.0) and z > VillageLayout.CENTER.y - 4.0
+			if score > best_h and ok_place:
 				best_h = score
 				best = Vector3(x, h, z)
 			r += 1.0

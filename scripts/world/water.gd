@@ -6,9 +6,9 @@ extends MeshInstance3D
 func build() -> void:
 	name = "Water"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(400, 400)
+	plane.size = Vector2(500, 500)
 	mesh = plane
-	position.y = Terrain.WATER_LEVEL
+	position = Vector3(0, Terrain.WATER_LEVEL, -30)
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	var noise := FastNoiseLite.new()
@@ -25,7 +25,6 @@ func build() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/water.gdshader")
 	mat.set_shader_parameter("ripple", tex)
-	mat.set_shader_parameter("height_map", Terrain.height_tex)
-	mat.set_shader_parameter("map_size", Terrain.SIZE)
-	mat.set_shader_parameter("map_res", float(Terrain.SEGS + 1))
+	Terrain.apply_map(mat)
+	mat.set_shader_parameter("swamp", Vector3(SwampLayout.CENTER.x, SwampLayout.CENTER.y, SwampLayout.RADIUS + 2.0))
 	material_override = mat

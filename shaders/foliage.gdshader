@@ -9,12 +9,17 @@ render_mode cull_back;
 #include "res://shaders/restore.gdshaderinc"
 
 global uniform vec3 hero_pos;
+global uniform float wind_strength;
 
 uniform vec3 albedo : source_color = vec3(0.5);
 uniform int kind = 0; // 0 — листва/прочее, 1 — камень, 2 — дерево (кора)
 uniform sampler2D rock_tex : source_color, filter_linear_mipmap, repeat_enable;
 // 1 — растение «вырастает», когда сюда доходит оживание (цветы у маяка)
 uniform int grow = 0;
+// false — постройки и вещи (не качаются на ветру)
+uniform bool wind_sway = true;
+// для одиночных объектов (не MultiMesh): x — высота основания, y — высота модели
+instance uniform vec2 base_h = vec2(0.0, 0.0);
 
 varying vec3 w_pos;
 varying vec3 w_nrm;
@@ -32,12 +37,13 @@ void vertex() {
 		VERTEX = (inverse(MODEL_MATRIX) * vec4(wp, 1.0)).xyz;
 	}
 	// INSTANCE_CUSTOM: x — высота основания, y — высота модели
-	ly = clamp((wp.y - INSTANCE_CUSTOM.x) / max(INSTANCE_CUSTOM.y, 0.01), 0.0, 1.0);
+	vec2 bh = base_h.y > 0.0 ? base_h : INSTANCE_CUSTOM.xy;
+	ly = clamp((wp.y - bh.x) / max(bh.y, 0.01), 0.0, 1.0);
 	w_nrm = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz);
-	if (kind != 1) {
+	if (kind != 1 && wind_sway) {
 		// кроны чуть качаются на ветру
 		float sway = sin(TIME * 0.9 + wp.x * 0.3 + wp.z * 0.2) * 0.5 + sin(TIME * 1.7 + wp.x * 0.7) * 0.2;
-		vec3 off = vec3(sway, 0.0, sway * 0.4) * ly * ly * 0.08 * INSTANCE_CUSTOM.y * 0.25;
+		vec3 off = vec3(sway, 0.0, sway * 0.4) * ly * ly * 0.08 * INSTANCE_CUSTOM.y * 0.25 * wind_strength;
 		VERTEX += (inverse(MODEL_MATRIX) * vec4(off, 0.0)).xyz;
 		wp += off;
 	}
@@ -45,14 +51,17 @@ void vertex() {
 }
 
 void fragment() {
-	// растворение загораживающих героя объектов
+	// растворение загораживающих героя объектов и всего, что вплотную к камере (верхушки елей)
 	vec3 hv = (VIEW_MATRIX * vec4(hero_pos + vec3(0.0, 0.8, 0.0), 1.0)).xyz;
+	float hide = 0.0;
 	if (VERTEX.z > hv.z + 0.6) {
 		vec2 a = VERTEX.xy / -VERTEX.z;
 		vec2 b = hv.xy / -hv.z;
-		float hide = 1.0 - smoothstep(0.12, 0.24, length(a - b));
-		if (hide > 0.0 && hash12(floor(FRAGCOORD.xy)) < hide * 0.85) discard;
+		hide = 1.0 - smoothstep(0.16, 0.34, length(a - b));
+		// чем ближе к камере, тем прозрачнее
+		hide = max(hide, 1.0 - smoothstep(-hv.z * 0.45, -hv.z * 0.8, -VERTEX.z));
 	}
+	if (hide > 0.0 && hash12(floor(FRAGCOORD.xy)) < hide * 0.9) discard;
 
 	float ao = mix(0.35, 1.0, smoothstep(0.0, 0.35, ly));
 	float n = vnoise(w_pos.xz * 1.7 + w_pos.y * 0.9) * 0.6 + vnoise(w_pos.xz * 6.0 + w_pos.y * 4.0) * 0.4;
@@ -77,6 +86,13 @@ void fragment() {
 	vec3 alive = kind == 0 ? col * vec3(1.05, 1.4, 0.9) * 1.2 : col * 1.15;
 	ALBEDO = mix(night, alive, rs);
 	EMISSION = vec3(1.0, 0.68, 0.32) * wave_edge(w_pos) * 0.5;
+	if (kind == 5) {
+		// окна: тёплый свет изнутри, чуть дрожит, как огонь очага
+		float fl = 0.85 + 0.15 * sin(TIME * 2.3 + w_pos.x * 3.1) * sin(TIME * 3.7 + w_pos.z * 2.3);
+		ALBEDO = vec3(0.12, 0.07, 0.03);
+		EMISSION = vec3(1.0, 0.6, 0.26) * 2.4 * fl;
+		ROUGHNESS = 0.3;
+	}
 	ROUGHNESS = rough;
 	SPECULAR = 0.3;
 }

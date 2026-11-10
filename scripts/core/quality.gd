@@ -27,8 +27,9 @@ static func setup() -> void:
 			fireflies = 70; dust = 120; min_render_scale = 0.55
 		_:
 			shadows = true; grass_per_m2 = 40.0; volumetric_fog = true; ssao = true
-			fireflies = 110; dust = 200; min_render_scale = 0.6
+			fireflies = 110; dust = 200; min_render_scale = 0.5
 	# отладочные переопределения: --shadows=0 --grass=10 --vfog=0
 	if Args.has("shadows"): shadows = Args.get_value("shadows") == "1"
 	if Args.has("grass"): grass_per_m2 = float(Args.get_value("grass"))
 	if Args.has("vfog"): volumetric_fog = Args.get_value("vfog") == "1"
+	if Args.has("ssao"): ssao = Args.get_value("ssao") == "1"

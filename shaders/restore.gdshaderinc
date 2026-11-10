@@ -24,5 +24,5 @@ float wave_edge(vec3 p) {
 	if (beacon_wave.w < 0.0) return 0.0;
 	float d = distance(p.xz, beacon_wave.xz);
 	float x = (d - beacon_wave.w) / 1.4;
-	return exp(-x * x) * (1.0 - smoothstep(22.0, 28.0, beacon_wave.w));
+	return exp(-x * x);
 }

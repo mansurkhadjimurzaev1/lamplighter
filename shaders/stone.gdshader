@@ -5,6 +5,8 @@ render_mode cull_back;
 #include "res://shaders/include_map.gdshaderinc"
 #include "res://shaders/restore.gdshaderinc"
 
+global uniform vec3 hero_pos;
+uniform bool fade_near = false; // стены замка растворяются, если закрывают героя
 uniform sampler2D rock_tex : source_color, filter_linear_mipmap, repeat_enable;
 uniform vec3 center = vec3(0.0);
 uniform float base_y = 0.0;
@@ -21,6 +23,15 @@ void vertex() {
 }
 
 void fragment() {
+	if (fade_near) {
+		vec3 hv = (VIEW_MATRIX * vec4(hero_pos + vec3(0.0, 0.8, 0.0), 1.0)).xyz;
+		if (VERTEX.z > hv.z + 0.8) {
+			vec2 a = VERTEX.xy / -VERTEX.z;
+			vec2 b = hv.xy / -hv.z;
+			float hide = 1.0 - smoothstep(0.14, 0.3, length(a - b));
+			if (hide > 0.0 && hash12(floor(FRAGCOORD.xy)) < hide * 0.85) discard;
+		}
+	}
 	vec3 nn = normalize(w_nrm);
 	vec3 bw = pow(abs(nn), vec3(4.0));
 	bw /= bw.x + bw.y + bw.z;

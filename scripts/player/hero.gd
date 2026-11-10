@@ -16,6 +16,11 @@ var distance := 0.0 # пройденный путь — для звука шаг
 var move_target: Variant = null # точка после тапа/клика
 var _walking := false
 var _busy := 0.0 # пока > 0 — герой занят анимацией (пробуждение)
+## Трясина: замедление (1 — нормально) и насколько герой погрузился
+var slow := 1.0
+var sink := 0.0
+## Пока герой в лодке — им управляет переправа
+var riding := false
 
 
 func build() -> void:
@@ -84,9 +89,15 @@ func face(p: Vector3) -> void:
 
 
 func update_hero(dt: float, input_dir: Vector2, cam: Camera3D, colliders: Array[Vector3], active: bool) -> void:
+	if riding:
+		_walking = false
+		speed = 0.0
+		anim.play("Idle", 0.3)
+		anim.speed_scale = 1.0
+		return
 	if _busy > 0.0:
 		_busy -= dt
-		global_position.y = Terrain.height_at(global_position.x, global_position.z)
+		global_position.y = ground_y(global_position.x, global_position.z)
 		return
 	var dir := Vector3.ZERO
 	if active:
@@ -107,7 +118,7 @@ func update_hero(dt: float, input_dir: Vector2, cam: Camera3D, colliders: Array[
 				dir = dir.normalized()
 
 	var moving := dir.length_squared() > 0.001
-	var target_speed := WALK_SPEED * minf(1.0, dir.length()) if moving else 0.0
+	var target_speed := WALK_SPEED * minf(1.0, dir.length()) * slow if moving else 0.0
 	speed += (target_speed - speed) * minf(1.0, dt * 8.0)
 	if moving:
 		var want := atan2(dir.x, dir.z)
@@ -117,12 +128,22 @@ func update_hero(dt: float, input_dir: Vector2, cam: Camera3D, colliders: Array[
 		var before := global_position
 		var next := before + Vector3(sin(facing), 0, cos(facing)) * speed * dt
 		next = _resolve(next, colliders)
-		if Terrain.height_at(next.x, next.z) < Terrain.WATER_LEVEL - 0.15:
-			next = before # не заходим в воду глубже щиколотки
-			move_target = null
+		# если герой оказался вне тропы (например, после переноса) — разрешаем шаги к тропе
+		var back_to_path := ForestLayout.path_dist(next.x, next.z) < ForestLayout.path_dist(before.x, before.z) - 0.001
+		if not can_stand(next.x, next.z) and not (back_to_path and SwampLayout.walkable(next.x, next.z, Terrain.height_at(next.x, next.z))):
+			# пробуем скользить вдоль края (тропы, берега, мостков)
+			var nx := Vector3(next.x, before.y, before.z)
+			var nz := Vector3(before.x, before.y, next.z)
+			if can_stand(nx.x, nx.z):
+				next = nx
+			elif can_stand(nz.x, nz.z):
+				next = nz
+			else:
+				next = before
+				move_target = null
 		distance += Vector2(next.x - before.x, next.z - before.z).length()
 		global_position = next
-	global_position.y = Terrain.height_at(global_position.x, global_position.z)
+	global_position.y = ground_y(global_position.x, global_position.z)
 	rotation.y = facing
 
 	# «стоит» ↔ «идёт», темп шага подстраивается под скорость
@@ -134,6 +155,24 @@ func update_hero(dt: float, input_dir: Vector2, cam: Camera3D, colliders: Array[
 		_walking = false
 		anim.play("Idle", 0.35)
 	anim.speed_scale = 0.85 * maxf(0.5, w) if _walking else 1.0
+
+
+## Можно ли стоять: лесные тропы, берег, мелководье топи, мостки
+static func can_stand(x: float, z: float) -> bool:
+	if CastleLayout.blocked(x, z):
+		return false
+	if CastleLayout.on_bridge(x, z):
+		return true
+	return ForestLayout.walkable(x, z) and MountainLayout.walkable(x, z) and SwampLayout.walkable(x, z, Terrain.height_at(x, z))
+
+
+## Высота под ногами: настил мостков или дно (на мелководье герой стоит в воде)
+func ground_y(x: float, z: float) -> float:
+	if SwampLayout.on_boardwalk(x, z):
+		return SwampLayout.deck_height(x, z)
+	if CastleLayout.on_bridge(x, z):
+		return maxf(CastleLayout.deck_height(x, z), Terrain.height_at(x, z))
+	return Terrain.height_at(x, z) - sink
 
 
 func _resolve(p: Vector3, colliders: Array[Vector3]) -> Vector3:
