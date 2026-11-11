@@ -3,9 +3,14 @@
 	"news": [
 		"quest:ferry_fix!=active & quest:ferry_fix!=done",
 		"quest:ferry_fix=active & item:rope & item:resin",
-		"quest:swamp_beacon=done & !flag:korney_after"
+		"quest:swamp_beacon=done & !flag:korney_after",
+		"item:korney_bread"
 	],
 	"entries": [
+		{
+			"if": "item:korney_bread",
+			"node": "bread"
+		},
 		{
 			"if": "quest:swamp_beacon=done & !flag:korney_after",
 			"node": "after"
@@ -130,6 +135,20 @@
 			"do": [
 				"flag:korney_after",
 				"quest:mountain_beacon=active"
+			],
+			"next": "end"
+		},
+		"bread": {
+			"text": [
+				"Это что? Лепёшка… Тёплая ещё. От кого?",
+				"…От Мары. Двадцать лет. Двадцать лет я думал, что в Броде меня забыли. А меня, выходит, ждали. Это я забыл дорогу.",
+				"Возьми масло. У меня запас — на чёрный день берёг. А он, гляди-ка, оказался светлым."
+			],
+			"do": [
+				"take:korney_bread",
+				"oil:0.6",
+				"quest:mara_bread=done",
+				"save"
 			],
 			"next": "end"
 		}

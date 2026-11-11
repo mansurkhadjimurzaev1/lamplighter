@@ -2,12 +2,27 @@
 	"name": "Мара",
 	"news": [
 		"quest:mara_trade!=active & quest:mara_trade!=done",
-		"quest:mara_trade=active & trinkets"
+		"quest:mara_trade=active & trinkets",
+		"item:letter_mara",
+		"flag:has_lantern & quest:mara_trade=done & quest:mara_bread!=active & quest:mara_bread!=done",
+		"flag:has_lantern & quest:mara_trade=active & quest:mara_bread!=active & quest:mara_bread!=done & quest:light_beacon=done"
 	],
 	"entries": [
 		{
+			"if": "item:letter_mara",
+			"node": "letter"
+		},
+		{
 			"if": "quest:mara_trade!=active & quest:mara_trade!=done",
 			"node": "first"
+		},
+		{
+			"if": "flag:has_lantern & quest:mara_trade=done & quest:mara_bread!=active & quest:mara_bread!=done",
+			"node": "bread_ask"
+		},
+		{
+			"if": "flag:has_lantern & quest:mara_trade=active & quest:mara_bread!=active & quest:mara_bread!=done & quest:light_beacon=done",
+			"node": "bread_ask"
 		},
 		{
 			"if": "true",
@@ -135,6 +150,54 @@
 		"got_herbs": {
 			"text": "Мята да чабрец. Заваришь у костра — вспомнишь мою чайхану.",
 			"next": "menu"
+		},
+		"bread_ask": {
+			"text": [
+				"Фонарщик, погоди. Я тут лепёшку испекла — лишнюю, как будто рука сама.",
+				"В Топи, за мостками, живёт Корней-паромщик. Двадцать лет к нам не заходит. Гордый он, или стыдно ему — не знаю. Но хлеб — он и гордому хлеб. Отнесёшь?"
+			],
+			"choices": [
+				{
+					"text": "Отнесу. Пока тёплая.",
+					"do": [
+						"quest:mara_bread=active",
+						"give:korney_bread",
+						"save"
+					],
+					"next": "bread_ok"
+				},
+				{
+					"text": "А что ему сказать?",
+					"do": [
+						"quest:mara_bread=active",
+						"give:korney_bread",
+						"save"
+					],
+					"next": "bread_say"
+				}
+			]
+		},
+		"bread_say": {
+			"text": "Ничего не говори. Скажи — от Мары. Он поймёт. А не поймёт — так съест, и то хорошо.",
+			"next": "end"
+		},
+		"bread_ok": {
+			"text": "Я её в платок завернула, в два слоя. Платок пусть себе оставит — у него, небось, и платка нет.",
+			"next": "end"
+		},
+		"letter": {
+			"text": [
+				"Письмо? Мне? Почерк… Это Тимур, братишка мой. Он в город ушёл, когда я ещё косы носила.",
+				"«Сестра, у меня всё хорошо. Женился, дочку назвал Марой — в честь тебя. Как только станет светлее, приедем в Брод на чай. Держи самовар горячим».",
+				"Двадцать лет держу, Тимур. Двадцать лет… Фонарщик, вот тебе масло. Нет, не спорь. За такую весть — мало."
+			],
+			"do": [
+				"take:letter_mara",
+				"flag:letter_mara_done",
+				"oil:0.4",
+				"deliver_letter"
+			],
+			"next": "end"
 		}
 	}
 }

@@ -21,6 +21,10 @@ var slow := 1.0
 var sink := 0.0
 ## Пока герой в лодке — им управляет переправа
 var riding := false
+var instant_turn := false
+## В доме: прямоугольник пола (мир, xz) и высота пола; пустой — герой снаружи
+var room := Rect2()
+var room_y := 0.0 # вид от первого лица: поворот без задержки
 
 
 func build() -> void:
@@ -122,7 +126,10 @@ func update_hero(dt: float, input_dir: Vector2, cam: Camera3D, colliders: Array[
 	speed += (target_speed - speed) * minf(1.0, dt * 8.0)
 	if moving:
 		var want := atan2(dir.x, dir.z)
-		facing += wrapf(want - facing, -PI, PI) * minf(1.0, dt * 10.0)
+		if instant_turn:
+			facing = want
+		else:
+			facing += wrapf(want - facing, -PI, PI) * minf(1.0, dt * 10.0)
 
 	if speed > 0.01:
 		var before := global_position
@@ -130,13 +137,14 @@ func update_hero(dt: float, input_dir: Vector2, cam: Camera3D, colliders: Array[
 		next = _resolve(next, colliders)
 		# если герой оказался вне тропы (например, после переноса) — разрешаем шаги к тропе
 		var back_to_path := ForestLayout.path_dist(next.x, next.z) < ForestLayout.path_dist(before.x, before.z) - 0.001
-		if not can_stand(next.x, next.z) and not (back_to_path and SwampLayout.walkable(next.x, next.z, Terrain.height_at(next.x, next.z))):
-			# пробуем скользить вдоль края (тропы, берега, мостков)
+		var inside := room.size.x > 0.0
+		if not _can(next.x, next.z) and (inside or not (back_to_path and SwampLayout.walkable(next.x, next.z, Terrain.height_at(next.x, next.z)))):
+			# пробуем скользить вдоль края (тропы, берега, мостков, стен)
 			var nx := Vector3(next.x, before.y, before.z)
 			var nz := Vector3(before.x, before.y, next.z)
-			if can_stand(nx.x, nx.z):
+			if _can(nx.x, nx.z):
 				next = nx
-			elif can_stand(nz.x, nz.z):
+			elif _can(nz.x, nz.z):
 				next = nz
 			else:
 				next = before
@@ -166,8 +174,16 @@ static func can_stand(x: float, z: float) -> bool:
 	return ForestLayout.walkable(x, z) and MountainLayout.walkable(x, z) and SwampLayout.walkable(x, z, Terrain.height_at(x, z))
 
 
+func _can(x: float, z: float) -> bool:
+	if room.size.x > 0.0:
+		return room.has_point(Vector2(x, z))
+	return can_stand(x, z)
+
+
 ## Высота под ногами: настил мостков или дно (на мелководье герой стоит в воде)
 func ground_y(x: float, z: float) -> float:
+	if room.size.x > 0.0:
+		return room_y
 	if SwampLayout.on_boardwalk(x, z):
 		return SwampLayout.deck_height(x, z)
 	if CastleLayout.on_bridge(x, z):

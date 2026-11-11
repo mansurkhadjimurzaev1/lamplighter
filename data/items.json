@@ -50,5 +50,37 @@
 	"star_page": {
 		"name": "Лист звёздной карты",
 		"trinket": false
+	},
+	"scarf": {
+		"name": "Шерстяной шарф Лии",
+		"trinket": false
+	},
+	"salve": {
+		"name": "Мазь Вейла",
+		"trinket": false
+	},
+	"moonherb": {
+		"name": "Лунная трава",
+		"trinket": false
+	},
+	"korney_bread": {
+		"name": "Лепёшка в платке",
+		"trinket": false
+	},
+	"post_bag": {
+		"name": "Сумка почтальона",
+		"trinket": false
+	},
+	"letter_mara": {
+		"name": "Письмо для Мары",
+		"trinket": false
+	},
+	"letter_borta": {
+		"name": "Письмо для Борты",
+		"trinket": false
+	},
+	"letter_lia": {
+		"name": "Письмо для Лии",
+		"trinket": false
 	}
 }

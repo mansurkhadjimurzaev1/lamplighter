@@ -15,6 +15,8 @@ static var min_render_scale := 0.6
 
 static func setup() -> void:
 	level = "medium" if OS.has_feature("mobile") else "high"
+	if Settings.quality in ["low", "medium", "high"]:
+		level = Settings.quality
 	var forced := Args.get_value("q", "")
 	if forced in ["low", "medium", "high"]:
 		level = forced

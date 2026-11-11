@@ -20,7 +20,7 @@ var _t := 0.0
 ## cfg: id, name, model, scale, hide_extra, swaps [[src Color, tol, dst Color]], scarf Color, pose
 func build(cfg: Dictionary) -> void:
 	id = cfg.id
-	display_name = cfg.name
+	display_name = Tr.t(cfg.name)
 	name = "NPC_" + id
 	var model: Node3D = (load("res://assets/models/people/%s.glb" % cfg.model) as PackedScene).instantiate()
 	add_child(model)

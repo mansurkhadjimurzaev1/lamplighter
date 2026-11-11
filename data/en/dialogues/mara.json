@@ -1,0 +1,203 @@
+{
+	"name": "Mara",
+	"news": [
+		"quest:mara_trade!=active & quest:mara_trade!=done",
+		"quest:mara_trade=active & trinkets",
+		"item:letter_mara",
+		"flag:has_lantern & quest:mara_trade=done & quest:mara_bread!=active & quest:mara_bread!=done",
+		"flag:has_lantern & quest:mara_trade=active & quest:mara_bread!=active & quest:mara_bread!=done & quest:light_beacon=done"
+	],
+	"entries": [
+		{
+			"if": "item:letter_mara",
+			"node": "letter"
+		},
+		{
+			"if": "quest:mara_trade!=active & quest:mara_trade!=done",
+			"node": "first"
+		},
+		{
+			"if": "flag:has_lantern & quest:mara_trade=done & quest:mara_bread!=active & quest:mara_bread!=done",
+			"node": "bread_ask"
+		},
+		{
+			"if": "flag:has_lantern & quest:mara_trade=active & quest:mara_bread!=active & quest:mara_bread!=done & quest:light_beacon=done",
+			"node": "bread_ask"
+		},
+		{
+			"if": "true",
+			"node": "hello"
+		}
+	],
+	"nodes": {
+		"first": {
+			"text": [
+				"Come in, sit down. The tea is still hot. My samovar is the only thing in the whole Ford that has never once gone out.",
+				"Every evening I set out cups for everyone. No one comes. I set them out anyway. Habit — or hope, I don't know which."
+			],
+			"next": "first2"
+		},
+		"first2": {
+			"text": "You're heading for the beacon, I can see it in your eyes. You won't get far without oil. I don't have much, but I trade. If you find anything worth something by the roads and fences — bring it. I'll give oil, bread or herbs.",
+			"do": [
+				"quest:mara_trade=active"
+			],
+			"next": "menu"
+		},
+		"hello": {
+			"text": "Sit down, lamplighter. Your cup is waiting.",
+			"alt": {
+				"if": "quest:light_beacon=done",
+				"text": "Do you hear? The neighbours are talking again. Three people came in today — just like that, for tea. Sit down, lamplighter, your cup is waiting."
+			},
+			"next": "menu"
+		},
+		"menu": {
+			"text": "How can I help?",
+			"choices": [
+				{
+					"text": "I'd like to trade.",
+					"if": "trinkets",
+					"next": "trade_pick"
+				},
+				{
+					"text": "I have nothing to trade…",
+					"if": "!trinkets",
+					"next": "nothing"
+				},
+				{
+					"text": "Tell me about the Ford.",
+					"next": "about"
+				},
+				{
+					"text": "I'll be going.",
+					"next": "bye"
+				}
+			]
+		},
+		"nothing": {
+			"text": "Look along the road to the beacon, by the old fences, by the cart. People dropped a lot when they stopped leaving their homes. Things wait too, just like us.",
+			"next": "end"
+		},
+		"about": {
+			"text": "On market days you couldn't push your way through to the well. Lia wasn't born yet. She's seven — and all seven years it's been dark. She thinks that's how it should be. That's the most frightening thing of all.",
+			"next": "menu"
+		},
+		"bye": {
+			"text": "Go. And come back — the tea will cool, and I'll brew a fresh pot.",
+			"next": "end"
+		},
+		"trade_pick": {
+			"text": "Well now, what have you got?",
+			"choices_from": "trinkets",
+			"pick_next": "trade_what"
+		},
+		"trade_what": {
+			"text": "{sel_mara}",
+			"choices": [
+				{
+					"text": "I'll take oil.",
+					"do": [
+						"take:$sel",
+						"oil:0.5",
+						"quest:mara_trade=done"
+					],
+					"next": "got_oil"
+				},
+				{
+					"text": "I'll take the copper wire.",
+					"if": "!flag:got_wire",
+					"do": [
+						"take:$sel",
+						"give:wire",
+						"flag:got_wire",
+						"quest:mara_trade=done"
+					],
+					"next": "got_wire"
+				},
+				{
+					"text": "I'll take a flatbread.",
+					"do": [
+						"take:$sel",
+						"give:bread",
+						"quest:mara_trade=done"
+					],
+					"next": "got_bread"
+				},
+				{
+					"text": "I'll take herbs.",
+					"do": [
+						"take:$sel",
+						"give:herbs",
+						"quest:mara_trade=done"
+					],
+					"next": "got_herbs"
+				}
+			]
+		},
+		"got_oil": {
+			"text": "Here. Oil isn't water — pour it sparingly. Fire likes being cared for.",
+			"next": "menu"
+		},
+		"got_wire": {
+			"text": "Take the copper to Borta, he's been sighing over it for ages. Just don't tell him it's from me — he'll get proud.",
+			"next": "menu"
+		},
+		"got_bread": {
+			"text": "Still warm from the oven. Bread on the road is like a friend: it says nothing, but things are easier with it.",
+			"next": "menu"
+		},
+		"got_herbs": {
+			"text": "Mint and thyme. Brew them by a campfire — you'll remember my teahouse.",
+			"next": "menu"
+		},
+		"bread_ask": {
+			"text": [
+				"Lamplighter, wait. I baked a flatbread — an extra one, as if my hands did it on their own.",
+				"In the Mire, past the boardwalks, lives Korney the ferryman. He hasn't come to us in twenty years. Proud, or ashamed — I don't know. But bread is bread, even for a proud man. Will you take it?"
+			],
+			"choices": [
+				{
+					"text": "I will. While it's warm.",
+					"do": [
+						"quest:mara_bread=active",
+						"give:korney_bread",
+						"save"
+					],
+					"next": "bread_ok"
+				},
+				{
+					"text": "What should I tell him?",
+					"do": [
+						"quest:mara_bread=active",
+						"give:korney_bread",
+						"save"
+					],
+					"next": "bread_say"
+				}
+			]
+		},
+		"bread_say": {
+			"text": "Say nothing. Say it's from Mara. He'll understand. And if he doesn't — he'll eat it, and that's good too.",
+			"next": "end"
+		},
+		"bread_ok": {
+			"text": "I wrapped it in a cloth, two layers. Let him keep the cloth — I bet he doesn't even have one.",
+			"next": "end"
+		},
+		"letter": {
+			"text": [
+				"A letter? For me? This handwriting… It's Timur, my little brother. He left for the city when I still wore braids.",
+				"\"Sister, all is well with me. I married, and named my daughter Mara — after you. As soon as it gets lighter, we'll come to the Ford for tea. Keep the samovar hot.\"",
+				"I've kept it hot for twenty years, Timur. Twenty years… Lamplighter, here's oil for you. No, don't argue. For news like this — it's too little."
+			],
+			"do": [
+				"take:letter_mara",
+				"flag:letter_mara_done",
+				"oil:0.4",
+				"deliver_letter"
+			],
+			"next": "end"
+		}
+	}
+}

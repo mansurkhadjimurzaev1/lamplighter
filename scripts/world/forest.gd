@@ -6,6 +6,7 @@ extends Node3D
 const GUIDES := 34
 const GUIDE_SPEED := 1.15
 
+var hut_node: Node3D # хижина Вейла (дверь — вход в дом)
 var _route := PackedVector2Array()
 var _route_len := 0.0
 var _seg_len: Array[float] = []
@@ -189,6 +190,7 @@ func _hut() -> void:
 	var v := ForestLayout.N["V"]
 	var hut := Props.make("village/House_4.glb", 3.8)
 	add_child(hut)
+	hut_node = hut
 	hut.global_position = _at(v + Vector2(-3.2, -1.5), -0.05)
 	hut.rotation.y = deg_to_rad(60)
 	Props.settle(hut)

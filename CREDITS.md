@@ -13,8 +13,10 @@
 | Постройки и вещи деревни (Medieval Village Pack), грядки (Crops Pack) | `assets/models/village/` | Quaternius | https://quaternius.com — GLB из зеркала https://github.com/trebeljahr/quaternius-showcase | CC0 1.0 |
 | Овца (Farm Animals Animated, 2018) | `assets/models/animals/Sheep.fbx` | Quaternius | https://quaternius.com — из зеркала https://github.com/beep2bleep/FreeAssetsByKenneyNLandQuaternius | CC0 1.0 |
 | Текстура брусчатки PavingStones070 | `assets/textures/ground/PavingStones070_*` | ambientCG | https://ambientcg.com/view?id=PavingStones070 | CC0 1.0 |
+| Шрифт Ruslan Display (заголовки) | `assets/fonts/RuslanDisplay-Regular.ttf` | Denis Masharov | https://fonts.google.com/specimen/Ruslan+Display | SIL OFL 1.1 |
+| Шрифт Cormorant Garamond (текст) | `assets/fonts/CormorantGaramond*.ttf` | Christian Thalmann | https://fonts.google.com/specimen/Cormorant+Garamond | SIL OFL 1.1 |
 | Движок Godot 4.7 | — | Godot Engine contributors | https://godotengine.org | MIT |
 
 Все звуки (ветер, фитиль, шаги, птицы, кузнечики, петухи, овцы, колодец, голоса) синтезируются кодом в `scripts/audio/` — сторонних аудиофайлов нет.
 Самовар, ковры, хлебная печь, горн, фонари на столбах, доска объявлений — построены кодом (`scripts/world/village.gd`).
-Шрифт заставки — системный (Georgia / Times New Roman), в игру не включается.
+

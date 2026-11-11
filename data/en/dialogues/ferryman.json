@@ -1,0 +1,156 @@
+{
+	"name": "Korney the Ferryman",
+	"news": [
+		"quest:ferry_fix!=active & quest:ferry_fix!=done",
+		"quest:ferry_fix=active & item:rope & item:resin",
+		"quest:swamp_beacon=done & !flag:korney_after",
+		"item:korney_bread"
+	],
+	"entries": [
+		{
+			"if": "item:korney_bread",
+			"node": "bread"
+		},
+		{
+			"if": "quest:swamp_beacon=done & !flag:korney_after",
+			"node": "after"
+		},
+		{
+			"if": "quest:ferry_fix=active & item:rope & item:resin",
+			"node": "fix"
+		},
+		{
+			"if": "quest:ferry_fix=active",
+			"node": "waiting"
+		},
+		{
+			"if": "quest:ferry_fix=done",
+			"node": "ready"
+		},
+		{
+			"if": "true",
+			"node": "first"
+		}
+	],
+	"nodes": {
+		"first": {
+			"text": [
+				"Stop there. Don't come near the edge — the boards are rotten, and the water's deeper than it looks. Like everything in this Mire.",
+				"A lamplighter… Fancy that. I thought your kind were gone. Thought I was the last one left who remembered what light is for."
+			],
+			"choices": [
+				{
+					"text": "I need to get to the islet. To the beacon.",
+					"next": "need"
+				},
+				{
+					"text": "What are those lights over the bog?",
+					"next": "wisps"
+				}
+			]
+		},
+		"wisps": {
+			"text": "Marsh gas. Burns pretty, warm — from afar just like a beacon. People walked toward that fire and never came back. It promises nothing, it just burns and waits for you to stumble. Remember: true light doesn't run away when you walk toward it.",
+			"next": "need"
+		},
+		"need": {
+			"text": [
+				"To the beacon, then. You can't walk across the channel — it's deep as a well there. Only by boat.",
+				"And the boat leaks. Twenty years I've ferried no one — she's dried out. Same as me."
+			],
+			"choices": [
+				{
+					"text": "How can I help?",
+					"next": "ask"
+				},
+				{
+					"text": "Take me anyway, I'll pay with oil.",
+					"next": "oil"
+				}
+			]
+		},
+		"oil": {
+			"text": "Keep your oil — you need it more. Here we take payment in deeds, not oil. That's how it was under my father and that's how it'll be under me, while I breathe.",
+			"next": "ask"
+		},
+		"ask": {
+			"text": "Bring me rope — on the old boardwalk, to the west, I dropped a coil somewhere. I'll unpick it for caulking. And resin — it's on the dead tree by the tussocks to the north. Only don't go toward the light itself. Walk the tussocks and look at your feet, not at the glow.",
+			"do": [
+				"quest:ferry_fix=active",
+				"quest:swamp_beacon=active",
+				"save"
+			],
+			"next": "end"
+		},
+		"waiting": {
+			"text": "Rope's on the western boardwalk. Resin's on the dead tree to the north, by the tussocks. The boat will wait. She and I both know how to wait.",
+			"alt": {
+				"if": "item:rope",
+				"text": "You found the rope, good. Now the resin — on the dead tree to the north, by the tussocks. And don't follow the light, you hear?"
+			},
+			"next": "end"
+		},
+		"fix": {
+			"text": [
+				"Let's see… Good rope. And the resin — smells right, of the woods and of patience.",
+				"Sit a while, I'll be quick. Caulking is simple work: tight, along the seam, no hurry. Like everything that holds water."
+			],
+			"choices": [
+				{
+					"text": "Why did you stay here alone?",
+					"next": "why"
+				},
+				{
+					"text": "Thank you, Korney.",
+					"next": "fixed"
+				}
+			]
+		},
+		"why": {
+			"text": "Someone has to remember where the channel is. If I leave, there won't be a trace. I'm not waiting for the light to come back, lamplighter. I'm waiting for people to come back. It's not the same thing, though it looks alike.",
+			"next": "fixed"
+		},
+		"fixed": {
+			"text": "Done. She holds. Get in when you're ready — at the pier. And here, take my ferry book. There's something written in it I've kept quiet about. Twenty years. That's enough.",
+			"do": [
+				"take:rope",
+				"take:resin",
+				"flag:ferry_fixed",
+				"quest:ferry_fix=done",
+				"note:ferry_log",
+				"save"
+			],
+			"next": "end"
+		},
+		"ready": {
+			"text": "The boat is ready. Say the word at the pier — I'll take you.",
+			"next": "end"
+		},
+		"after": {
+			"text": [
+				"Hear that? Frogs. Shouting like they've been kept out of the choir for twenty years. The water's babbling — I'd forgotten it knew how to babble and not just stand.",
+				"You know, I think I'll paint the boat. Red. So it can be seen from the shore — the ferry's running. Let them come.",
+				"And you — go to the mountains, west, past the village. Old Ansar is there with his observatory. He knows more about the smoke than anyone. Only dress warm — up there the cold eats fire."
+			],
+			"do": [
+				"flag:korney_after",
+				"quest:mountain_beacon=active"
+			],
+			"next": "end"
+		},
+		"bread": {
+			"text": [
+				"What's this? Bread… Still warm. Who's it from?",
+				"…From Mara. Twenty years. For twenty years I thought the Ford had forgotten me. And it turns out they were waiting. It was I who forgot the road.",
+				"Take this oil. I kept a store for a dark day. And look — the day turned out bright."
+			],
+			"do": [
+				"take:korney_bread",
+				"oil:0.6",
+				"quest:mara_bread=done",
+				"save"
+			],
+			"next": "end"
+		}
+	}
+}

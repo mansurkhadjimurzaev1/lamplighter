@@ -10,6 +10,8 @@ static var oil := 1.0
 static var flasks_taken: Array = [] # индексы подобранных флаконов
 static var state := {} # история: флаги, задания, вещи, записки
 static var explored := "" # исследованное на карте
+## После «Новой игры» сцена перезагружается — меню второй раз не показываем
+static var skip_menu_once := false
 
 
 static func load_game() -> void:

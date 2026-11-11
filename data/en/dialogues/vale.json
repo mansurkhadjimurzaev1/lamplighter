@@ -1,0 +1,151 @@
+{
+	"name": "Vale the Herbalist",
+	"news": [
+		"quest:vale_mushrooms!=active & quest:vale_mushrooms!=done",
+		"quest:vale_mushrooms=active & item:mushroom>=3",
+		"quest:forest_beacon=done & !flag:vale_after",
+		"quest:borta_herbs=active & item:moonherb>=4 & !item:salve"
+	],
+	"entries": [
+		{
+			"if": "quest:borta_herbs=active & item:moonherb>=4 & !item:salve",
+			"node": "salve"
+		},
+		{
+			"if": "quest:forest_beacon=done & !flag:vale_after",
+			"node": "after"
+		},
+		{
+			"if": "quest:vale_mushrooms=active & item:mushroom>=3",
+			"node": "brought"
+		},
+		{
+			"if": "quest:vale_mushrooms=active",
+			"node": "waiting"
+		},
+		{
+			"if": "quest:vale_mushrooms=done",
+			"node": "later"
+		},
+		{
+			"if": "true",
+			"node": "first"
+		}
+	],
+	"nodes": {
+		"first": {
+			"text": [
+				"Hush… Don't stamp so. The wood doesn't like loud folk. It's frightened enough as it is.",
+				"Ah, the lamplighter. Oldrich said you'd come. Mind you, he said it twenty years ago. I decided you'd got lost."
+			],
+			"choices": [
+				{
+					"text": "Why do you live here alone?",
+					"next": "alone"
+				},
+				{
+					"text": "How do I find the beacon?",
+					"next": "how"
+				}
+			]
+		},
+		"alone": {
+			"text": "When the beacons went out, people stopped coming to me for herbs. Why heal, they said, if it's dark anyway. I took offence and stopped going out. Foolish, isn't it? A grudge is a shade too — only your own, a homemade one. You almost feel sorry to chase it off.",
+			"next": "how"
+		},
+		"how": {
+			"text": [
+				"The paths here lead in circles. Not because the wood is wicked — it's just tired and has forgotten where roads go.",
+				"But the fireflies remember. They fly to the beacon, even a dead one. Follow the ones that fly, not the ones that circle. And don't argue with the path: if it brought you back, you turned the wrong way — it didn't cheat you."
+			],
+			"choices": [
+				{
+					"text": "Thank you, Vale.",
+					"next": "ask"
+				},
+				{
+					"text": "And if I get lost anyway?",
+					"next": "lost"
+				}
+			]
+		},
+		"lost": {
+			"text": "Then stop, catch your breath and raise the lantern higher. Getting lost is no shame. Pretending to know the way when you don't — that is.",
+			"next": "ask"
+		},
+		"ask": {
+			"text": "Since you're going deeper — gather some glowcaps for me. Three of them. They glow right beside the paths, where the earth remembers light. They make a brew that gives people dreams. Good ones. No one in the Ford has dreamed of anything for a long time.",
+			"do": [
+				"quest:vale_mushrooms=active",
+				"quest:forest_beacon=active",
+				"save"
+			],
+			"next": "end"
+		},
+		"waiting": {
+			"text": "Looking for glowcaps? Three are needed. No rush — they won't run away. Mushrooms are the most patient folk in the wood.",
+			"alt": {
+				"if": "item:herbs",
+				"text": "Wait… is that mint you have? It smells like Mara's mint, I know her thyme. Did she send anything? No? Well, never mind. Mint is a letter in itself. Look for glowcaps by the paths, three of them."
+			},
+			"next": "end"
+		},
+		"brought": {
+			"text": "Three glowcaps! Look how they shine — like little lanterns, only quiet. Thank you, lamplighter.",
+			"choices": [
+				{
+					"text": "Will you take the brew to the Ford?",
+					"next": "brought2"
+				},
+				{
+					"text": "Who will dream these dreams?",
+					"next": "dreams"
+				}
+			]
+		},
+		"dreams": {
+			"text": "Lia, for one. Mara once told me: the girl sleeps and sees nothing. Darkness outside is half the trouble. The trouble is when it's dark inside too.",
+			"next": "brought2"
+		},
+		"brought2": {
+			"text": "I'll take it. Myself. It's time. Twenty years of sulking isn't patience, it's just stubbornness. Take some oil for the road — and my notebook. Everything I've understood about this wood is in it. Not much, but honest.",
+			"do": [
+				"take:mushroom*3",
+				"oil:1.0",
+				"note:vale_notes",
+				"quest:vale_mushrooms=done",
+				"save"
+			],
+			"next": "end"
+		},
+		"later": {
+			"text": "The brew is steeping. You can smell it across the whole glade. If the fireflies start circling again — go where they fly. They don't make mistakes.",
+			"next": "end"
+		},
+		"after": {
+			"text": [
+				"Do you hear? A woodpecker! Knocking like at a door. I've waited so many years for someone to knock.",
+				"You know… I think I'll open it. And go to the Ford. Today. Not tomorrow.",
+				"And you — go east, to the Mire. There's a beacon on an islet, and only old Korney ferries people there. If he's still alive. He's more stubborn than me — so he's alive."
+			],
+			"do": [
+				"flag:vale_after",
+				"quest:swamp_beacon=active"
+			],
+			"next": "end"
+		},
+		"salve": {
+			"text": [
+				"Moonwort. Four stalks, and all whole — you gathered them with care.",
+				"For Borta? I thought so. He burns himself every winter and every winter he says nothing.",
+				"Sit by the fire while I brew… There. Morning and evening. And tell him: keeping quiet about pain is not strength. Strength is walking to the one who can help."
+			],
+			"do": [
+				"take:moonherb*4",
+				"give:salve",
+				"save"
+			],
+			"next": "end"
+		}
+	}
+}

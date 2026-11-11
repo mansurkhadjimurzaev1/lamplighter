@@ -3,9 +3,14 @@
 	"news": [
 		"quest:vale_mushrooms!=active & quest:vale_mushrooms!=done",
 		"quest:vale_mushrooms=active & item:mushroom>=3",
-		"quest:forest_beacon=done & !flag:vale_after"
+		"quest:forest_beacon=done & !flag:vale_after",
+		"quest:borta_herbs=active & item:moonherb>=4 & !item:salve"
 	],
 	"entries": [
+		{
+			"if": "quest:borta_herbs=active & item:moonherb>=4 & !item:salve",
+			"node": "salve"
+		},
 		{
 			"if": "quest:forest_beacon=done & !flag:vale_after",
 			"node": "after"
@@ -126,6 +131,19 @@
 			"do": [
 				"flag:vale_after",
 				"quest:swamp_beacon=active"
+			],
+			"next": "end"
+		},
+		"salve": {
+			"text": [
+				"Лунная трава. Четыре стебля, и все целые — ты собирал бережно.",
+				"Для Борты? Так и думал. Он каждую зиму обжигается и каждую зиму молчит.",
+				"Посиди у огня, пока варю… Вот. Пусть мажет утром и вечером. И скажи ему: молчать о боли — не сила. Сила — дойти до того, кто поможет."
+			],
+			"do": [
+				"take:moonherb*4",
+				"give:salve",
+				"save"
 			],
 			"next": "end"
 		}

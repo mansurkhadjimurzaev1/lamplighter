@@ -1,0 +1,180 @@
+{
+	"name": "Borta the Smith",
+	"news": [
+		"flag:has_lantern & quest:borta_lantern!=active & quest:borta_lantern!=done",
+		"quest:borta_lantern=active & item:wire",
+		"item:letter_borta",
+		"item:salve",
+		"quest:borta_lantern=done & quest:borta_herbs!=active & quest:borta_herbs!=done"
+	],
+	"entries": [
+		{
+			"if": "item:letter_borta",
+			"node": "letter"
+		},
+		{
+			"if": "item:salve",
+			"node": "healed"
+		},
+		{
+			"if": "!flag:has_lantern",
+			"node": "no_lantern"
+		},
+		{
+			"if": "quest:borta_lantern=done & quest:borta_herbs!=active & quest:borta_herbs!=done",
+			"node": "burn"
+		},
+		{
+			"if": "quest:borta_lantern=done & quest:light_beacon=done",
+			"node": "after"
+		},
+		{
+			"if": "quest:borta_lantern=done",
+			"node": "done"
+		},
+		{
+			"if": "quest:borta_lantern=active & item:wire",
+			"node": "forge"
+		},
+		{
+			"if": "quest:borta_lantern=active",
+			"node": "waiting"
+		},
+		{
+			"if": "true",
+			"node": "first"
+		}
+	],
+	"nodes": {
+		"no_lantern": {
+			"text": "Hm. A lamplighter without a lantern is like a smith without a hammer. Go to Oldrich, he's waiting for you. Been pacing by his door for three days.",
+			"next": "end"
+		},
+		"first": {
+			"text": [
+				"Hm. So Oldrich gave you his father's lantern after all. Let me see.",
+				"Good work. Old. The tank is small, the cap is burnt through. It'll get you up the hill, but beyond that — I don't know."
+			],
+			"choices": [
+				{
+					"text": "Can you fix it?",
+					"next": "offer"
+				},
+				{
+					"text": "It served forty years. It'll serve more.",
+					"next": "stubborn"
+				}
+			]
+		},
+		"stubborn": {
+			"text": "Stubborn. That's good. Stubbornness is the same as patience, only with fists. But listen anyway.",
+			"next": "offer"
+		},
+		"offer": {
+			"text": "Bring me copper — wire, even one coil. I'll make a bigger tank and a sturdier cap. It'll burn longer and shine wider. Mara has copper sometimes… she trades. Tell her it's for me — she'll… no, don't tell her.",
+			"do": [
+				"quest:borta_lantern=active"
+			],
+			"next": "end"
+		},
+		"waiting": {
+			"text": "Brought the copper? No? Well, the anvil can wait. It's patient — it's been beaten for twenty years and it still stands.",
+			"next": "end"
+		},
+		"forge": {
+			"text": "Now that's more like it! Sit, I'll be quick. The fire in my forge never goes out — I didn't put it out even under the decree. Kept it quiet, under the ash.",
+			"choices": [
+				{
+					"text": "Why didn't you put it out?",
+					"next": "why"
+				},
+				{
+					"text": "Thank you, Borta.",
+					"next": "work"
+				}
+			]
+		},
+		"why": {
+			"text": "Why would I? Fire is like hope. You don't hold it in a fist — you'll smother it. You keep it in your palms. Quietly, but you keep it.",
+			"next": "work"
+		},
+		"work": {
+			"text": "Done. Tank twice as big, copper cap. Here. And don't play the hero — the lantern is new, but your legs are old.",
+			"do": [
+				"take:wire",
+				"upgrade_lantern",
+				"quest:borta_lantern=done",
+				"save"
+			],
+			"next": "end"
+		},
+		"done": {
+			"text": "Well, does it shine? There you go. For twenty years I hammered the anvil so I wouldn't hear the silence. Today I hammered it because there was someone to hammer for.",
+			"next": "end"
+		},
+		"after": {
+			"text": "Hear how it rings? I used to strike to drown out the silence. Now I strike so it can be heard. Feel the difference? So do I, now.",
+			"next": "end"
+		},
+		"burn": {
+			"text": [
+				"Eh? My hands? Nothing wrong with my hands. So I burned them. A smith without burns is no smith.",
+				"…Fine. They hurt. I can hold a hammer, but not a nail. Vale in the forest makes a salve that heals it in a week. Only he needs moonwort, and I haven't gone near the forest in — well, you know how many years."
+			],
+			"choices": [
+				{
+					"text": "I'll gather the herb and go to Vale.",
+					"do": [
+						"quest:borta_herbs=active",
+						"save"
+					],
+					"next": "burn_ok"
+				},
+				{
+					"text": "Why didn't you say so?",
+					"do": [
+						"quest:borta_herbs=active",
+						"save"
+					],
+					"next": "burn_why"
+				}
+			]
+		},
+		"burn_why": {
+			"text": "Because a smith doesn't complain. Horseshoes complain to him. Go on, since you noticed. The herb glows blue — in open places, where the wind blows.",
+			"next": "end"
+		},
+		"burn_ok": {
+			"text": "Four stalks, Vale said. It glows blue and grows where it's open and windy. Thank you, old man.",
+			"next": "end"
+		},
+		"healed": {
+			"text": [
+				"Salve? From Vale? Let's see… Oh. It's cold. Like snow down your collar, only nice.",
+				"Listen. While my hands were healing — well, while you were walking — I thought something up for you. A hood for the lantern. Copper, with slits: the wind goes around it, and the flame can breathe.",
+				"Give me the lantern. …There. Now the Pall can blow all it likes — your fire will hardly notice."
+			],
+			"do": [
+				"take:salve",
+				"flag:veil_hood",
+				"quest:borta_herbs=done",
+				"save"
+			],
+			"next": "end"
+		},
+		"letter": {
+			"text": [
+				"A letter for me? Who'd write to me… Ha! It's Yarik, my apprentice! Ran off to the city, the rascal, twenty years ago.",
+				"\"Master, I'm a smith myself now, with my own forge and two apprentices. I teach them the way you taught me: iron doesn't like hurry. When it's light in the Ford, I'll come and show you what I've forged.\"",
+				"Iron doesn't like hurry… He remembers, eh. Here, take some oil. Take it, take it, I'm kind today."
+			],
+			"do": [
+				"take:letter_borta",
+				"flag:letter_borta_done",
+				"oil:0.3",
+				"deliver_letter"
+			],
+			"next": "end"
+		}
+	}
+}

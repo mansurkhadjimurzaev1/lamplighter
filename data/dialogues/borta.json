@@ -1,13 +1,49 @@
 {
 	"name": "Кузнец Борта",
-	"news": ["flag:has_lantern & quest:borta_lantern!=active & quest:borta_lantern!=done", "quest:borta_lantern=active & item:wire"],
+	"news": [
+		"flag:has_lantern & quest:borta_lantern!=active & quest:borta_lantern!=done",
+		"quest:borta_lantern=active & item:wire",
+		"item:letter_borta",
+		"item:salve",
+		"quest:borta_lantern=done & quest:borta_herbs!=active & quest:borta_herbs!=done"
+	],
 	"entries": [
-		{"if": "!flag:has_lantern", "node": "no_lantern"},
-		{"if": "quest:borta_lantern=done & quest:light_beacon=done", "node": "after"},
-		{"if": "quest:borta_lantern=done", "node": "done"},
-		{"if": "quest:borta_lantern=active & item:wire", "node": "forge"},
-		{"if": "quest:borta_lantern=active", "node": "waiting"},
-		{"if": "true", "node": "first"}
+		{
+			"if": "item:letter_borta",
+			"node": "letter"
+		},
+		{
+			"if": "item:salve",
+			"node": "healed"
+		},
+		{
+			"if": "!flag:has_lantern",
+			"node": "no_lantern"
+		},
+		{
+			"if": "quest:borta_lantern=done & quest:borta_herbs!=active & quest:borta_herbs!=done",
+			"node": "burn"
+		},
+		{
+			"if": "quest:borta_lantern=done & quest:light_beacon=done",
+			"node": "after"
+		},
+		{
+			"if": "quest:borta_lantern=done",
+			"node": "done"
+		},
+		{
+			"if": "quest:borta_lantern=active & item:wire",
+			"node": "forge"
+		},
+		{
+			"if": "quest:borta_lantern=active",
+			"node": "waiting"
+		},
+		{
+			"if": "true",
+			"node": "first"
+		}
 	],
 	"nodes": {
 		"no_lantern": {
@@ -20,8 +56,14 @@
 				"Хорошая работа. Старая. Бак маловат, колпак прогорел. На холм хватит, а дальше — не знаю."
 			],
 			"choices": [
-				{"text": "Можешь его поправить?", "next": "offer"},
-				{"text": "Он служил сорок лет. Послужит ещё.", "next": "stubborn"}
+				{
+					"text": "Можешь его поправить?",
+					"next": "offer"
+				},
+				{
+					"text": "Он служил сорок лет. Послужит ещё.",
+					"next": "stubborn"
+				}
 			]
 		},
 		"stubborn": {
@@ -30,7 +72,9 @@
 		},
 		"offer": {
 			"text": "Принеси мне меди — проволоки, хоть моток. Сделаю бак побольше и колпак покрепче. Гореть будет дольше, светить шире. Медь бывает у Мары… она меняет. Скажешь, что для меня, — она… а, не говори.",
-			"do": ["quest:borta_lantern=active"],
+			"do": [
+				"quest:borta_lantern=active"
+			],
 			"next": "end"
 		},
 		"waiting": {
@@ -40,8 +84,14 @@
 		"forge": {
 			"text": "Вот это дело! Посиди, я быстро. Огонь в горне не гаснет — я и при указе его не тушил. Тихо держал, под пеплом.",
 			"choices": [
-				{"text": "Почему не тушил?", "next": "why"},
-				{"text": "Спасибо, Борта.", "next": "work"}
+				{
+					"text": "Почему не тушил?",
+					"next": "why"
+				},
+				{
+					"text": "Спасибо, Борта.",
+					"next": "work"
+				}
 			]
 		},
 		"why": {
@@ -50,7 +100,12 @@
 		},
 		"work": {
 			"text": "Готово. Бак вдвое больше, колпак медный. Держи. И не геройствуй — фонарь новый, а ноги у тебя старые.",
-			"do": ["take:wire", "upgrade_lantern", "quest:borta_lantern=done", "save"],
+			"do": [
+				"take:wire",
+				"upgrade_lantern",
+				"quest:borta_lantern=done",
+				"save"
+			],
 			"next": "end"
 		},
 		"done": {
@@ -59,6 +114,66 @@
 		},
 		"after": {
 			"text": "Слышишь, как звенит? Раньше я бил, чтобы заглушить тишину. Теперь — чтобы её было слышно. Чувствуешь разницу? Вот и я теперь чувствую.",
+			"next": "end"
+		},
+		"burn": {
+			"text": [
+				"А? Руки? Ничего с руками. Подумаешь — обжёг. Кузнец без ожогов — не кузнец.",
+				"…Ладно. Болят. Молот держу, а гвоздь — уже нет. Вейл в лесу мазь варит, от неё за неделю заживает. Да только ему лунная трава нужна, а я к лесу — сам знаешь, сколько лет не ходил."
+			],
+			"choices": [
+				{
+					"text": "Я соберу траву и схожу к Вейлу.",
+					"do": [
+						"quest:borta_herbs=active",
+						"save"
+					],
+					"next": "burn_ok"
+				},
+				{
+					"text": "Почему сразу не сказал?",
+					"do": [
+						"quest:borta_herbs=active",
+						"save"
+					],
+					"next": "burn_why"
+				}
+			]
+		},
+		"burn_why": {
+			"text": "Потому что кузнец не жалуется. Ему жалуется подкова. Иди уж, раз заметил. Трава светится голубым — на открытых местах, где ветер.",
+			"next": "end"
+		},
+		"burn_ok": {
+			"text": "Четыре стебля, Вейл говорил. Светится голубым, растёт там, где открыто и ветрено. Спасибо, старик.",
+			"next": "end"
+		},
+		"healed": {
+			"text": [
+				"Мазь? От Вейла? Ну-ка… Ох. Холодит. Как снег за шиворот, только хорошо.",
+				"Слушай. Пока руки заживали — ну, пока ты ходил — я тебе одну вещь придумал. Колпак на фонарь. Медный, с прорезями: ветер огибает, а пламя дышит.",
+				"Давай фонарь. …Вот. Теперь Пелена может дуть сколько хочет — твой огонь её почти не заметит."
+			],
+			"do": [
+				"take:salve",
+				"flag:veil_hood",
+				"quest:borta_herbs=done",
+				"save"
+			],
+			"next": "end"
+		},
+		"letter": {
+			"text": [
+				"Мне письмо? Кто мне писать станет… Ха! Это ж Ярик, подмастерье мой! Сбежал в город, шельмец, двадцать лет назад.",
+				"«Мастер, я теперь сам кузнец, у меня своя мастерская и два ученика. Учу их, как вы учили: железо не любит спешки. Когда в Броде будет светло — приеду, покажу, что выковал». ",
+				"Железо не любит спешки… Помнит, а. На, держи масло. Бери-бери, я сегодня добрый."
+			],
+			"do": [
+				"take:letter_borta",
+				"flag:letter_borta_done",
+				"oil:0.3",
+				"deliver_letter"
+			],
 			"next": "end"
 		}
 	}

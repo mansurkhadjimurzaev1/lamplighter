@@ -2,9 +2,25 @@
 	"name": "Лия",
 	"news": [
 		"quest:lia_sun!=active & quest:lia_sun!=done",
-		"quest:lia_sun=active & item:flower"
+		"quest:lia_sun=active & item:flower",
+		"item:letter_lia",
+		"flag:lamb_home & quest:lia_lamb=active",
+		"flag:has_lantern & quest:lia_sun=active & quest:lia_lamb!=active & quest:lia_lamb!=done",
+		"flag:has_lantern & quest:lia_sun=done & quest:lia_lamb!=active & quest:lia_lamb!=done"
 	],
 	"entries": [
+		{
+			"if": "item:letter_lia",
+			"node": "letter"
+		},
+		{
+			"if": "flag:lamb_home & quest:lia_lamb=active",
+			"node": "lamb_back"
+		},
+		{
+			"if": "flag:has_lantern & quest:lia_lamb!=active & quest:lia_lamb!=done & quest:lia_sun=done",
+			"node": "lamb_ask"
+		},
 		{
 			"if": "quest:lia_sun=done",
 			"node": "done"
@@ -12,6 +28,10 @@
 		{
 			"if": "quest:lia_sun=active & item:flower",
 			"node": "give"
+		},
+		{
+			"if": "flag:has_lantern & quest:lia_lamb!=active & quest:lia_lamb!=done & quest:lia_sun=active",
+			"node": "lamb_ask"
 		},
 		{
 			"if": "quest:lia_sun=active & quest:light_beacon=done",
@@ -123,6 +143,60 @@
 				"if": "flag:lia_honest",
 				"text": "А ещё ты честный. Ты сказал, что не помнишь солнце. Значит, когда ты скажешь, что оно вернётся, — я поверю."
 			},
+			"next": "end"
+		},
+		"lamb_ask": {
+			"text": [
+				"Дедушка-фонарщик… Звёздочка убежала. Моя овечка, маленькая, с белым пятнышком на лбу.",
+				"Фонарь у загона погас, она испугалась темноты и выскочила в калитку. Я слышала, как она плачет — там, на севере, где дорога в лес. А мне одной туда нельзя."
+			],
+			"choices": [
+				{
+					"text": "Я найду её. Обещаю.",
+					"do": [
+						"quest:lia_lamb=active",
+						"save"
+					],
+					"next": "lamb_ok"
+				},
+				{
+					"text": "Темнота её не обидит. Я приведу Звёздочку.",
+					"do": [
+						"quest:lia_lamb=active",
+						"save"
+					],
+					"next": "lamb_ok"
+				}
+			]
+		},
+		"lamb_ok": {
+			"text": "Она пойдёт за светом, она умная! Только позови её ласково, она громких не любит.",
+			"next": "end"
+		},
+		"lamb_back": {
+			"text": [
+				"Звёздочка! Ты вернулась! Ой, какая грязная… Ничего, отмоем.",
+				"Дедушка-фонарщик, вот. Это шарф. Я вязала его папе, но папа далеко, ему пока не нужно. А тебе в горах холодно, я знаю — у тебя нос красный."
+			],
+			"do": [
+				"give:scarf",
+				"flag:scarf",
+				"quest:lia_lamb=done",
+				"save"
+			],
+			"next": "end"
+		},
+		"letter": {
+			"text": [
+				"Мне? Письмо — мне? Мне никто никогда не писал…",
+				"«Лиечка, солнышко моё. Я работаю далеко за горами, под землёй, где тоже темно. Говорят, там внизу что-то горит и не гаснет. Я вернусь, когда загорятся маяки. Слушайся маму. Папа».",
+				"Он вернётся, когда загорятся маяки… Дедушка, ты ведь их зажигаешь? Значит, ты ведёшь папу домой."
+			],
+			"do": [
+				"take:letter_lia",
+				"flag:letter_lia_done",
+				"deliver_letter"
+			],
 			"next": "end"
 		}
 	}

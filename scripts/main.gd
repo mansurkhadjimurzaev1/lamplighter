@@ -3,7 +3,7 @@ extends Node3D
 ## Состояния: PLAY — игра, LIGHTING — зажигание маяка, FAINT — обморок,
 ## DIALOGUE — разговор, JOURNAL — журнал открыт.
 
-enum State { PLAY, LIGHTING, FAINT, DIALOGUE, JOURNAL, MAP, FERRY, PAUSE }
+enum State { PLAY, LIGHTING, FAINT, DIALOGUE, JOURNAL, MAP, FERRY, PAUSE, MENU, ENDING, CUTSCENE }
 
 ## Задание, которое закрывается зажжением маяка (по номеру маяка)
 const BEACON_QUESTS := ["light_beacon", "forest_beacon", "swamp_beacon", "mountain_beacon", "castle_final"]
@@ -59,7 +59,25 @@ var lantern: Lantern
 var cam: CameraRig
 var sound: Soundscape
 var region_audio: RegionAudio
-var title: TitleScreen
+var title: MainMenu
+var _loading: LoadingScreen
+var ending: Ending
+var prologue: Prologue
+## Этап 6: дома с интерьерами, волны Пелены, подсказка цели, добрые дела
+var interiors: Interiors
+var veil := Veil.new()
+var goal_hud: GoalHud
+var deeds: Deeds
+var _door_t := -1.0 # переход через дверь (затемнение), −1 — нет
+var _door_to := -1 # куда: номер комнаты или −1 — наружу
+var _rumble: AudioStreamPlayer
+var _guide_t := 0.0
+var _veil_vis := 0.0
+var _ash: GPUParticles3D
+var _exposure := 0.0
+var _menu_spot := Vector3.ZERO
+var _menu_fire: Node3D
+var _ending_pending := -1.0 # отсчёт до начала хорошего финала после зажжения пятого маяка
 var fps: FpsMeter
 var hud: Hud
 var dialogue: DialogueBox
@@ -105,7 +123,13 @@ var _shadow_soft := true
 
 
 func _ready() -> void:
+	Settings.load_settings()
+	if Args.has("lang"):
+		Settings.lang = Args.get_value("lang") # для проверок, без сохранения
 	Quality.setup()
+	_loading = LoadingScreen.new()
+	_loading.build()
+	add_child(_loading)
 	Beacon.all.clear()
 	GameState.load_data()
 	GameState.reset()
@@ -115,11 +139,13 @@ func _ready() -> void:
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		Engine.max_fps = 0
 
-	title = TitleScreen.new()
+	title = MainMenu.new()
 	title.build()
 	add_child(title)
 	title.started.connect(_on_start)
 	title.new_game.connect(_restart)
+	title.language_changed.connect(func(): get_tree().reload_current_scene())
+	title.quality_changed.connect(_apply_quality_live)
 	grade = Atmosphere.grade_layer(self)
 	grade.set_shader_parameter("fade", 0.0)
 	if Args.has("earlyN") and not get_tree().has_meta("pressed_n"):
@@ -131,13 +157,23 @@ func _ready() -> void:
 			Input.parse_input_event(ev))
 	fps = FpsMeter.new()
 	fps.build()
-	fps.extra = func(): return "%s · %.0f%% разрешения%s · кадр %.1f мс · масло %.0f%%" % [Quality.level, render_scale * 100.0, "" if env == null or env.environment.ssao_enabled else " · эффекты упрощены", _median(), oil.level * 100.0]
+	fps.extra = func(): return Tr.t("%s · %.0f%% разрешения%s · кадр %.1f мс · масло %.0f%%") % [Quality.level, render_scale * 100.0, "" if env == null or env.environment.ssao_enabled else Tr.t(" · эффекты упрощены"), _median(), oil.level * 100.0]
 	add_child(fps)
 
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_build_world()
+	_setup_menu_vista()
+	_loading.close()
 	title.set_ready()
+	state = State.MENU
+	sound.start() # в меню — ночной ветер, сверчки, треск костра
+	if Args.has("menulook"):
+		_menu_look()
+	elif SaveGame.skip_menu_once or Args.has("autotest") or Args.has("bench"):
+		SaveGame.skip_menu_once = false
+		title.visible = false
+		title.start()
 	if Args.has("pausetest"):
 		print("before: has_lantern=", GameState.flags.get("has_lantern", false), " has_save=", SaveGame.has_save())
 		if not get_tree().has_meta("paused_once"):
@@ -250,6 +286,7 @@ func _build_world() -> void:
 	if not Args.has("skip_village"):
 		village.build()
 	colliders.append_array(village.colliders)
+	_build_interiors()
 
 	var rock_tex: Texture2D = load("res://assets/textures/ground/Rock030_color.jpg")
 	var b := Beacon.new()
@@ -359,6 +396,16 @@ func _build_world() -> void:
 	hud = Hud.new()
 	hud.build()
 	add_child(hud)
+	goal_hud = GoalHud.new()
+	goal_hud.build()
+	add_child(goal_hud)
+	goal_hud.cam = cam
+	_ash = _make_ash()
+	add_child(_ash)
+	_rumble = AudioStreamPlayer.new()
+	_rumble.stream = Synth.cached("veil_rumble", func(): return Synth.filter(Synth.noise(12.0, true), "lp", 140.0, 0.7), true)
+	_rumble.volume_db = -80.0
+	add_child(_rumble)
 	hud.action_pressed.connect(_interact)
 	hud.journal_pressed.connect(_open_journal)
 	dialogue = DialogueBox.new()
@@ -375,10 +422,18 @@ func _build_world() -> void:
 	pause_menu.resume.connect(func(): state = State.PLAY)
 	pause_menu.new_game.connect(_restart)
 	pause_menu.quit_game.connect(func(): get_tree().quit())
+	pause_menu.language_changed.connect(func():
+		_save_progress()
+		get_tree().reload_current_scene())
+	pause_menu.quality_changed.connect(_apply_quality_live)
 
 	if not Args.has("skip_npcs"):
 		_spawn_npcs()
 	_spawn_pickups(beacon_pos)
+	deeds = Deeds.new()
+	add_child(deeds)
+	deeds.build(pickups)
+	deeds.message.connect(func(t): hud.toast(t))
 	_setup_interactables()
 
 	# карта: рисуем мир, восстанавливаем исследованное
@@ -398,7 +453,7 @@ func _build_world() -> void:
 		elif not open and state == State.MAP:
 			state = State.PLAY)
 	var vcl := VillageLayout.CENTER
-	minimap.labels = [{pos = CastleLayout.CENTER + Vector2(0, CastleLayout.RADIUS - 2.0), text = "Руины замка"}, {pos = vcl + Vector2(0, VillageLayout.RADIUS + 4.0), text = "Тихий Брод"}, {pos = ForestLayout.CENTER + Vector2(0, 8), text = "Шепчущий лес"}, {pos = SwampLayout.CENTER + Vector2(0, 18), text = "Топь"}, {pos = MountainLayout.CENTER + Vector2(0, 22), text = "Горная обсерватория"}]
+	minimap.labels = [{pos = CastleLayout.CENTER + Vector2(0, CastleLayout.RADIUS - 2.0), text = Tr.t("Руины замка")}, {pos = vcl + Vector2(0, VillageLayout.RADIUS + 4.0), text = Tr.t("Тихий Брод")}, {pos = ForestLayout.CENTER + Vector2(0, 8), text = Tr.t("Шепчущий лес")}, {pos = SwampLayout.CENTER + Vector2(0, 18), text = Tr.t("Топь")}, {pos = MountainLayout.CENTER + Vector2(0, 22), text = Tr.t("Горная обсерватория")}]
 
 	# действия из диалогов, которые выполняет игра
 	GameState.hooks = {
@@ -406,6 +461,9 @@ func _build_world() -> void:
 		oil = func(v): oil.add(v),
 		upgrade_lantern = _upgrade_lantern,
 		save = _save_progress,
+		king_to_beacon = _king_to_beacon,
+		ending_bad = func(): _start_ending.call_deferred(false),
+		deliver_letter = _check_letters,
 	}
 
 	# загрузка сохранения
@@ -416,6 +474,8 @@ func _build_world() -> void:
 	for bi in mountains.braziers.size():
 		if GameState.flags.get("brazier_%d" % bi, false):
 			mountains.light_brazier(bi)
+	for li in village.lamps.size():
+		village.set_lamp(li, GameState.flags.get("lamp_%d" % li, false), true)
 	if GameState.flags.get("lantern_upgraded", false):
 		oil.upgrade()
 		lantern.upgrade()
@@ -519,6 +579,8 @@ func _spawn_pickups(beacon_pos: Vector3) -> void:
 		pickups.add("note_" + note_id, "note:" + note_id, _ground3(MountainLayout.NOTES[note_id]))
 	pickups.add("rope", "rope", _ground3(SwampLayout.ROPE), "quest:ferry_fix=active")
 	pickups.add("resin", "resin", _ground3(SwampLayout.RESIN) + Vector3(0, 0.6, 0), "quest:ferry_fix=active")
+	for note_id in CastleLayout.NOTES:
+		pickups.add("note_" + note_id, "note:" + note_id, _ground3(CastleLayout.NOTES[note_id]))
 	for note_id in SwampLayout.NOTES:
 		pickups.add("note_" + note_id, "note:" + note_id, _ground3(SwampLayout.NOTES[note_id]))
 	for note_id in ForestLayout.NOTES:
@@ -529,10 +591,10 @@ func _spawn_pickups(beacon_pos: Vector3) -> void:
 func _setup_interactables() -> void:
 	for v in npcs:
 		var npc := v
-		interactables.append({node = npc, r = npc.talk_radius, pc = "E — поговорить: " + npc.display_name, touch = "Поговорить: " + npc.display_name,
+		interactables.append({node = npc, r = npc.talk_radius, pc = Tr.t("E — поговорить: ") + npc.display_name, touch = Tr.t("Поговорить: ") + npc.display_name,
 			act = func(): _talk(npc.id), ok = func(): return true})
 	var board := VillageLayout.world(VillageLayout.BOARD)
-	interactables.append({pos = Vector3(board.x, 0, board.y), r = 2.0, pc = "E — прочитать указ", touch = "Прочитать указ",
+	interactables.append({pos = Vector3(board.x, 0, board.y), r = 2.0, pc = Tr.t("E — прочитать указ"), touch = Tr.t("Прочитать указ"),
 		act = func():
 			GameState.apply("note:decree")
 			_open_journal("decree"),
@@ -540,22 +602,36 @@ func _setup_interactables() -> void:
 	for bi in mountains.braziers.size():
 		var bz: Dictionary = mountains.braziers[bi]
 		var idx: int = bi
-		interactables.append({pos = bz.pos, r = 2.8, pc = "E — разжечь жаровню", touch = "Разжечь жаровню",
+		interactables.append({pos = bz.pos, r = 2.8, pc = Tr.t("E — разжечь жаровню"), touch = Tr.t("Разжечь жаровню"),
 			act = func(): _light_brazier(idx),
 			ok = func(): return not mountains.braziers[idx].lit and GameState.flags.get("has_lantern", false)})
 	for k in 2:
 		var at_a := k == 0
 		var pier := SwampLayout.pier_a() if at_a else SwampLayout.pier_b()
-		interactables.append({pos = Vector3(pier.x, 0, pier.y), r = 2.6, pc = "E — переправиться", touch = "Переправиться",
+		interactables.append({pos = Vector3(pier.x, 0, pier.y), r = 2.6, pc = Tr.t("E — переправиться"), touch = Tr.t("Переправиться"),
 			act = _ferry_start,
 			ok = func(): return GameState.flags.get("ferry_fixed", false) and swamp.boat_at_a == at_a and not swamp.ferrying()})
 	for bb in beacons:
 		var beacon := bb
-		interactables.append({node = beacon, r = 3.4, pc = "E — зажечь маяк", touch = "Зажечь маяк",
+		interactables.append({node = beacon, r = 3.4, pc = Tr.t("E — зажечь маяк"), touch = Tr.t("Зажечь маяк"),
 			act = func(): _light(beacon), ok = func(): return not beacon.lit and GameState.flags.get("has_lantern", false) and (beacon.index < 4 or GameState.flags.get("castle_final_ready", false))})
+	for ri in interiors.rooms.size():
+		var room: Dictionary = interiors.rooms[ri]
+		var idx: int = ri
+		interactables.append({pos = room.door_out, r = 1.9, pc = Tr.t("E — войти: ") + room.title, touch = Tr.t("Войти: ") + room.title,
+			act = func(): _door_go(idx), ok = func(): return _door_t < 0.0 and not interiors.inside()})
+		interactables.append({pos = room.exit_in, r = 1.5, pc = Tr.t("E — выйти"), touch = Tr.t("Выйти"),
+			act = func(): _door_go(-1), ok = func(): return _door_t < 0.0 and interiors.current == idx})
+	for li in village.lamps.size():
+		var lidx: int = li
+		interactables.append({pos = village.lamp_pos(li), r = 1.9, pc = Tr.t("E — зажечь фонарь"), touch = Tr.t("Зажечь фонарь"),
+			act = func(): _light_lamp(lidx),
+			ok = func(): return not village.lamps[lidx].lit and GameState.flags.get("has_lantern", false) and oil.level > 0.05})
+	interactables.append({node = deeds.lamb, r = 3.0, pc = Tr.t("E — позвать Звёздочку"), touch = Tr.t("Позвать Звёздочку"),
+		act = deeds.call_lamb, ok = func(): return deeds.lamb_active() and not deeds.lamb_following})
 	for fr in castle.frescoes:
 		var fid: String = fr.id
-		interactables.append({pos = fr.pos, r = 2.4, pc = "E — рассмотреть фреску", touch = "Рассмотреть фреску",
+		interactables.append({pos = fr.pos, r = 2.4, pc = Tr.t("E — рассмотреть фреску"), touch = Tr.t("Рассмотреть фреску"),
 			act = func():
 				GameState.apply("note:" + fid)
 				_open_journal(fid),
@@ -587,9 +663,38 @@ func _respawn_point() -> Vector3:
 
 func _on_start() -> void:
 	started = true
-	sound.start()
+	state = State.PLAY
+	_leave_menu_vista()
+	var want_prologue: bool = not GameState.flags.get("prologue_seen", false) and not GameState.flags.get("has_lantern", false)
+	if want_prologue and (not Args.has("autotest") or Args.has("prologuetest")) and not Args.has("bench"):
+		_start_prologue()
+		return
 	if GameState.quest("get_lantern") == "active":
-		hud.toast("Старейшина Ольдрих ждёт у своего дома")
+		hud.toast(Tr.t("Старейшина Ольдрих ждёт у своего дома"))
+
+
+func _start_prologue() -> void:
+	state = State.CUTSCENE
+	hud.visible = false
+	minimap.visible = false
+	goal_hud.visible = false
+	prologue = Prologue.new()
+	add_child(prologue)
+	prologue.begin(self, cam, hero.global_position)
+	prologue.finished.connect(_end_prologue)
+
+
+func _end_prologue() -> void:
+	GameState.flags["prologue_seen"] = true
+	state = State.PLAY
+	hud.visible = true
+	minimap.visible = not Args.has("nomap")
+	goal_hud.visible = true
+	_fade = 0.0
+	cam.snap(hero.global_position)
+	prologue.queue_free()
+	prologue = null
+	hud.toast(Tr.t("Старейшина Ольдрих ждёт у своего дома"))
 
 
 func _setup_input() -> void:
@@ -608,6 +713,10 @@ func _setup_input() -> void:
 
 
 func _unhandled_input(e: InputEvent) -> void:
+	if _unhandled_key_ending(e):
+		return
+	if state == State.MENU:
+		return
 	if e is InputEventKey and e.pressed and not e.echo:
 		if e.physical_keycode == KEY_F:
 			fps.toggle()
@@ -621,7 +730,17 @@ func _unhandled_input(e: InputEvent) -> void:
 			_open_journal()
 		elif e.physical_keycode == KEY_M and state == State.PLAY and started:
 			minimap.toggle_full()
+		elif e.physical_keycode == KEY_V and state == State.PLAY and started:
+			Settings.first_person = not Settings.first_person
+			Settings.save_settings()
+			hud.toast(Tr.t("Вид от первого лица") if Settings.first_person else Tr.t("Вид сверху"))
 	if state != State.PLAY:
+		return
+	if cam.first_person:
+		if e is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			cam.mouse_look(e.relative)
+		elif e is InputEventMouseButton and e.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+			_mouse_raise = e.pressed
 		return
 	if e is InputEventMouseButton and e.button_index == MOUSE_BUTTON_RIGHT:
 		_mouse_raise = e.pressed
@@ -647,6 +766,8 @@ func _unhandled_input(e: InputEvent) -> void:
 		if was_raise or not was_tap or not started:
 			return
 		var hit: Variant = Terrain.raycast(cam.project_ray_origin(pos), cam.project_ray_normal(pos))
+		if hero.room.size.x > 0.0:
+			hit = Plane(Vector3.UP, hero.room_y).intersects_ray(cam.project_ray_origin(pos), cam.project_ray_normal(pos))
 		if hit != null:
 			hero.move_target = hit
 
@@ -684,8 +805,10 @@ func _talk(id: String) -> void:
 
 
 func _on_dialogue_closed() -> void:
-	state = State.PLAY
 	_talking_to = ""
+	if state == State.ENDING:
+		return
+	state = State.PLAY
 
 
 func _open_journal(note := "") -> void:
@@ -732,6 +855,9 @@ func _light(b: Beacon) -> void:
 	SaveGame.last_beacon = b.index
 	oil.level = 1.0 # огонь маяка заново наполняет фонарь
 	_save_progress()
+	hud.toast(Tr.t("Игра сохранена"))
+	if b.index == 4:
+		_ending_pending = 6.5 # пятый огонь — хорошая концовка
 
 
 func _start_faint() -> void:
@@ -747,9 +873,32 @@ func _process(dt: float) -> void:
 	if hero == null:
 		return
 	dt = minf(dt, 0.05)
+	if state == State.MENU:
+		_process_menu(dt)
+		return
+	if state == State.ENDING:
+		_process_ending(dt)
+		return
+	if state == State.CUTSCENE:
+		_process_cutscene(dt)
+		return
+	if _ending_pending > 0.0:
+		_ending_pending -= dt
+		if _ending_pending <= 0.0:
+			_start_ending(true)
+			return
 	_state_t += dt
-	var playing := started and state == State.PLAY
+	var playing := started and state == State.PLAY and _door_t < 0.0
 	var has_lantern: bool = GameState.flags.get("has_lantern", false)
+	var inside := interiors.inside()
+	_update_door(dt)
+	# волна Пелены: укрытие, сила, тревога
+	var shelter := _shelter()
+	var veil_ev := veil.tick(dt, started and has_lantern and beacons[0].lit and _castle_f < 0.3 and state in [State.PLAY, State.MAP, State.DIALOGUE, State.JOURNAL, State.FERRY])
+	_on_veil_event(veil_ev)
+	var life0 := Beacon.restore_at(hero.global_position) if not inside else 1.0
+	_exposure = veil.strength * (1.0 - shelter) * (1.0 - 0.6 * life0) * (0.45 if GameState.flags.get("veil_hood", false) else 1.0)
+	_veil_vis = lerpf(_veil_vis, 0.0 if inside else veil.strength * (1.0 - 0.5 * life0), 1.0 - exp(-dt * 1.5))
 
 	if _pressing and not _touch_raise and Time.get_ticks_msec() - _press_time > 350:
 		_touch_raise = true
@@ -757,6 +906,7 @@ func _process(dt: float) -> void:
 	if state == State.LIGHTING and _state_t < 1.6:
 		raised = true
 
+	_update_view_mode()
 	var axis := Input.get_vector("move_left", "move_right", "move_down", "move_up")
 	hero.update_hero(dt, axis, cam, colliders, playing)
 	_velocity = (hero.global_position - _last_hero_pos) / maxf(dt, 0.001)
@@ -768,13 +918,19 @@ func _process(dt: float) -> void:
 		var hp0 := hero.global_position
 		var wading := SwampLayout.in_swamp(hp0.x, hp0.z) and not SwampLayout.on_boardwalk(hp0.x, hp0.z) and Terrain.height_at(hp0.x, hp0.z) < -0.05
 		# холод: масло горит быстрее, чем холоднее
-		oil.drain(dt, raised, life > 0.5, (2.5 if wading else 1.0) * (1.0 + _cold * 2.0))
+		oil.drain(dt, raised, life > 0.5 or inside, (2.5 if wading else 1.0) * (1.0 + _cold * 2.0) * (1.0 + 2.0 * _exposure))
 	lantern.set_carried(has_lantern)
-	# холод гасит фонарь: свет тусклее и меньше, чем по маслу
-	var eff_oil := oil.level * (1.0 - _cold * 0.65)
-	lantern.update_lantern(dt, hero.hand_position(), eff_oil, raised)
-	cam.zoom = 1.55 if (state == State.LIGHTING and _state_t < 9.0) else (0.8 if state == State.DIALOGUE else 1.0 + _mtn_f * 0.2)
-	cam.follow(dt, hero.global_position, _velocity)
+	# холод и Пелена гасят фонарь: свет тусклее и меньше, чем по маслу
+	var eff_oil := oil.level * (1.0 - _cold * 0.65) * (1.0 - 0.3 * _exposure)
+	if cam.first_person:
+		cam.follow_fp(dt, hero.global_position, clampf(hero.speed / Hero.WALK_SPEED, 0.0, 1.0), hero.distance)
+		lantern.update_lantern(dt, cam.fp_lantern_pivot(), eff_oil, raised, 0.5)
+	else:
+		lantern.update_lantern(dt, hero.hand_position(), eff_oil, raised)
+		cam.zoom = 1.55 if (state == State.LIGHTING and _state_t < 9.0) else (0.8 if state == State.DIALOGUE else 1.0 + _mtn_f * 0.2)
+		if inside:
+			cam.zoom = 0.62
+		cam.follow(dt, hero.global_position, _velocity)
 	RenderingServer.global_shader_parameter_set("hero_pos", hero.global_position)
 	RenderingServer.global_shader_parameter_set("lantern_pos", lantern.light_world_position() if has_lantern else Vector3(0, -100, 0))
 	Beacon.update_globals()
@@ -784,11 +940,11 @@ func _process(dt: float) -> void:
 		v.update_npc(dt, hero.global_position, DialogueRunner.has_news(v.id), _talking_to == v.id)
 
 	# Тени
-	var light_r := oil.light_radius(raised) * (1.0 - _cold * 0.5) if has_lantern else 0.0
+	var light_r := oil.light_radius(raised) * (1.0 - _cold * 0.5) * (1.0 - 0.4 * _exposure) if has_lantern else 0.0
 	var out := oil.level < 0.04 or not has_lantern
-	if shades.tick(dt, hero.global_position, light_r, raised, out, colliders, playing):
+	if shades.tick(dt, hero.global_position, light_r, raised, out, colliders, playing and not inside):
 		_start_faint()
-	if castle_shades.tick(dt, hero.global_position, light_r, raised, out, colliders, playing):
+	if castle_shades.tick(dt, hero.global_position, light_r, raised, out, colliders, playing and not inside):
 		_start_faint()
 
 	# находки и подсказки
@@ -797,18 +953,20 @@ func _process(dt: float) -> void:
 		for ef in _extra_flasks:
 			ef.update_flasks(dt, hero.global_position)
 		pickups.update_pickups(dt, hero.global_position)
+		if has_lantern and GameState.quest("village_lamps") == "":
+			GameState.apply("quest:village_lamps=active")
 		# первый шаг в горы
 		if _mtn_f > 0.4 and GameState.quest("mountain_beacon") == "":
 			GameState.apply("quest:mountain_beacon=active")
-			hud.toast("Горы. Ветер здесь холоднее, чем память.")
+			hud.toast(Tr.t("Горы. Ветер здесь холоднее, чем память."))
 		# первый шаг в топь
 		if _swamp_f > 0.4 and GameState.quest("swamp_beacon") == "":
 			GameState.apply("quest:swamp_beacon=active")
-			hud.toast("Топь. Здесь даже тишина вязкая.")
+			hud.toast(Tr.t("Топь. Здесь даже тишина вязкая."))
 		# первый шаг в лес
 		if _forest_f > 0.35 and GameState.quest("forest_beacon") == "":
 			GameState.apply("quest:forest_beacon=active")
-			hud.toast("Шепчущий лес. Здесь тише, чем в тишине.")
+			hud.toast(Tr.t("Шепчущий лес. Здесь тише, чем в тишине."))
 		var it: Variant = _nearest_interactable()
 		if it != null:
 			hud.show_prompt(it.pc, it.touch, true)
@@ -817,6 +975,11 @@ func _process(dt: float) -> void:
 	else:
 		flasks.update_flasks(dt, Vector3(9999, 0, 9999))
 		pickups.update_pickups(dt, Vector3(9999, 0, 9999))
+	deeds.update(dt, hero.global_position, hero.facing, has_lantern and oil.level > 0.04, playing)
+	interiors.update(dt)
+	if inside:
+		interiors.set_view(cam.first_person)
+	_update_guide(dt, inside)
 	if state == State.LIGHTING and _state_t > 5.0:
 		state = State.PLAY
 	if state == State.FAINT:
@@ -828,10 +991,13 @@ func _process(dt: float) -> void:
 	# звук
 	if hero.distance >= _next_step_at:
 		_next_step_at = hero.distance + randf_range(0.62, 0.68)
-		sound.step(Terrain.surface_at(hero.global_position.x, hero.global_position.z))
-	_dawn = lerpf(_dawn, life, 1.0 - exp(-dt * 1.2))
+		sound.step("wood" if inside else Terrain.surface_at(hero.global_position.x, hero.global_position.z))
+	if not inside:
+		_dawn = lerpf(_dawn, life, 1.0 - exp(-dt * 1.2))
 	sound.calm = _dawn
 	sound.wick = (lerpf(0.25, 1.0, sqrt(oil.level)) * (1.4 if raised else 1.0)) if has_lantern else 0.0
+	if inside:
+		sound.wick = 1.7 # треск очага
 	sound.update_sound(dt)
 	var hp := hero.global_position
 	var vlife := Beacon.restore_at(hp) if beacons[0].lit else 0.0
@@ -845,20 +1011,29 @@ func _process(dt: float) -> void:
 	if beacons[3].lit:
 		mlife = 1.0 - Terrain.ss(beacons[3].radius - 6.0, beacons[3].radius, Vector2(hp.x - beacons[3].position.x, hp.z - beacons[3].position.z).length())
 	region_audio.update_layers(dt, {"village": vlife * (1.0 - _forest_f) * (1.0 - _swamp_f) * (1.0 - _mtn_f), "forest": flife, "swamp": slife, "mountains": mlife})
-	_mtn_f = lerpf(_mtn_f, MountainLayout.region_factor(hp.x, hp.z), 1.0 - exp(-dt * 0.8))
+	_mtn_f = lerpf(_mtn_f, 0.0 if inside else MountainLayout.region_factor(hp.x, hp.z), 1.0 - exp(-dt * 0.8))
 	mountains.update_mountains(dt, hp, _mtn_f, mlife)
-	RenderingServer.global_shader_parameter_set("wind_strength", 1.0 + _mtn_f * 1.8 * (1.0 - mlife * 0.6))
-	sound.mountain = _mtn_f * (1.0 - mlife * 0.7)
+	RenderingServer.global_shader_parameter_set("wind_strength", 1.0 + _mtn_f * 1.8 * (1.0 - mlife * 0.6) + 2.2 * _veil_vis)
+	sound.mountain = 0.0 if inside else maxf(_mtn_f * (1.0 - mlife * 0.7), 0.85 * _veil_vis)
+	_rumble.volume_db = linear_to_db(maxf(0.0001, (0.25 if inside else 0.9) * maxf(veil.strength, 0.6 if veil.warning() else 0.0)))
+	if _rumble.volume_db > -60.0 and not _rumble.playing:
+		_rumble.play()
+	elif _rumble.volume_db <= -60.0 and _rumble.playing:
+		_rumble.stop()
 	grade.set_shader_parameter("frost", _cold)
-	_forest_f = lerpf(_forest_f, ForestLayout.region_factor(hp.x, hp.z), 1.0 - exp(-dt * 0.8))
-	_swamp_f = lerpf(_swamp_f, SwampLayout.mask(hp.x, hp.z), 1.0 - exp(-dt * 0.8))
+	_forest_f = lerpf(_forest_f, 0.0 if inside else ForestLayout.region_factor(hp.x, hp.z), 1.0 - exp(-dt * 0.8))
+	_swamp_f = lerpf(_swamp_f, 0.0 if inside else SwampLayout.mask(hp.x, hp.z), 1.0 - exp(-dt * 0.8))
 	forest.update_forest(dt, hp, beacons[1].lit)
 	swamp.update_swamp(dt, hp, beacons[2].lit)
 
 	_update_castle(dt)
 	Atmosphere.set_dawn(env, _dawn, _forest_f, _swamp_f, _mtn_f, _castle_f)
 	_moon.light_energy = 0.42 * (1.0 - _castle_f)
-	_update_map()
+	_apply_veil_env(inside)
+	if not inside:
+		_update_map()
+	else:
+		minimap.set_shown(false)
 	grade.set_shader_parameter("dawn", _dawn)
 	hud.oil = oil.level
 	hud.show_flask = has_lantern and state != State.DIALOGUE
@@ -869,9 +1044,216 @@ func _process(dt: float) -> void:
 		_adapt_resolution(dt)
 
 
+# ── главное меню: ночной холм, костёр, фонарщик ──────────────
+
+func _setup_menu_vista() -> void:
+	# самый высокий холм острова вдали от деревни, маяка и моста
+	var best := Vector3.ZERO
+	var best_h := -INF
+	for i in 400:
+		var a := i * 0.31
+		var r := 14.0 + (i % 20) * 1.1
+		var x := cos(a) * r
+		var z := sin(a) * r
+		if VillageLayout.in_village(x, z, 6.0) or Vector2(x, z).distance_to(Vector2(beacons[0].position.x, beacons[0].position.z)) < 9.0:
+			continue
+		if Vector2(x, z).distance_to(CastleLayout.bridge_start) < 6.0 or not Hero.can_stand(x, z):
+			continue
+		var h := Terrain.height_at(x, z) + Terrain.normal_at(x, z).y * 2.0
+		if h > best_h:
+			best_h = h
+			best = Vector3(x, Terrain.height_at(x, z), z)
+	_menu_spot = best
+	# костёр: камни, пламя, искры, тёплый свет
+	_menu_fire = Node3D.new()
+	add_child(_menu_fire)
+	_menu_fire.global_position = best + Vector3(1.1, 0, 0.6)
+	var stone := StandardMaterial3D.new()
+	stone.albedo_color = Color(0.32, 0.3, 0.3)
+	for k in 8:
+		var st := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.13
+		sm.height = 0.18
+		st.mesh = sm
+		st.material_override = stone
+		st.position = Vector3(cos(k * TAU / 8.0) * 0.42, 0.04, sin(k * TAU / 8.0) * 0.42)
+		_menu_fire.add_child(st)
+	var fl := Fx.flames()
+	fl.amount = 24
+	fl.scale = Vector3.ONE * 0.6
+	fl.position.y = 0.12
+	fl.emitting = true
+	_menu_fire.add_child(fl)
+	var em := Fx.embers(14)
+	em.position.y = 0.2
+	em.emitting = true
+	_menu_fire.add_child(em)
+	var l := OmniLight3D.new()
+	l.light_color = Color(1.0, 0.55, 0.25)
+	l.light_energy = 2.2
+	l.omni_range = 8.0
+	l.position.y = 0.7
+	l.shadow_enabled = Quality.shadows
+	l.light_volumetric_fog_energy = 1.4
+	_menu_fire.add_child(l)
+	_menu_fire.set_meta("light", l)
+	# фонарщик сидит у огня
+	hero.global_position = best
+	hero.face(_menu_fire.global_position)
+	hero.riding = true
+	if hero.anim.has_animation("Sit_Floor_Idle"):
+		hero.anim.get_animation("Sit_Floor_Idle").loop_mode = Animation.LOOP_LINEAR
+		hero.anim.play("Sit_Floor_Idle")
+
+
+func _process_menu(dt: float) -> void:
+	_state_t += dt
+	var c := _menu_spot + Vector3(0.5, 0.9, 0.3)
+	var a := 0.6 + _state_t * 0.04
+	cam.global_position = c + Vector3(cos(a) * 6.5, 2.4 + sin(_state_t * 0.1) * 0.3, sin(a) * 6.5)
+	cam.look_at(c + Vector3(0, 0.3, 0), Vector3.UP)
+	lantern.set_carried(true)
+	lantern.update_lantern(dt, hero.hand_position(), 0.8, false)
+	var fl: OmniLight3D = _menu_fire.get_meta("light")
+	fl.light_energy = 2.2 * (0.85 + 0.15 * sin(_state_t * 9.0) * sin(_state_t * 5.3))
+	RenderingServer.global_shader_parameter_set("hero_pos", hero.global_position + Vector3(0, -50, 0))
+	RenderingServer.global_shader_parameter_set("lantern_pos", lantern.light_world_position())
+	Beacon.update_globals()
+	sound.wick = 1.8 # треск костра
+	sound.update_sound(dt)
+	region_audio.update_layers(dt, {"village": 0.0})
+	_crickets_menu(dt)
+	Atmosphere.set_dawn(env, 0.0)
+	_fade = minf(1.0, _fade + dt * 0.5)
+	grade.set_shader_parameter("fade", _fade)
+	minimap.set_shown(false)
+	minimap.update_map([Vector4.ZERO, Vector4.ZERO, Vector4.ZERO, Vector4.ZERO, Vector4.ZERO])
+	hud.show_flask = false
+
+
+var _menu_crickets: AudioStreamPlayer
+
+
+## Сверчки в меню (тихо, ночные)
+func _crickets_menu(_dt: float) -> void:
+	if _menu_crickets == null:
+		_menu_crickets = AudioStreamPlayer.new()
+		_menu_crickets.stream = Synth.cached("crickets_a", func(): return Synth.crickets(8.0, 5, 31), true)
+		_menu_crickets.volume_db = linear_to_db(0.18)
+		add_child(_menu_crickets)
+		_menu_crickets.play()
+
+
+func _leave_menu_vista() -> void:
+	if _menu_crickets:
+		_menu_crickets.stop()
+	if _menu_fire:
+		_menu_fire.queue_free()
+		_menu_fire = null
+	hero.riding = false
+	hero.anim.play("Idle")
+	hero.global_position = _respawn_point()
+	_last_hero_pos = hero.global_position
+	cam.snap(hero.global_position)
+	_fade = 0.0
+	if GameState.quest("get_lantern") == "active":
+		hud.toast(Tr.t("Старейшина Ольдрих ждёт у своего дома"))
+
+
+## Качество: часть применяется сразу, остальное — после перезапуска
+func _apply_quality_live() -> void:
+	Quality.setup()
+	var e := env.environment
+	e.ssao_enabled = Quality.ssao
+	e.volumetric_fog_enabled = Quality.volumetric_fog
+	lantern.light.shadow_enabled = Quality.shadows
+	render_scale = 1.0
+	get_viewport().scaling_3d_scale = 1.0
+
+
+# ── финал ───────────────────────────────────────────────────
+
+## Король встаёт и идёт к пятому маяку
+func _king_to_beacon() -> void:
+	for v in npcs:
+		if v.id == "king":
+			var p := CastleLayout.BEACON + Vector2(-2.6, -1.2)
+			v.place(Vector3(p.x, Terrain.height_at(p.x, p.y), p.y), atan2(CastleLayout.BEACON.x - p.x, CastleLayout.BEACON.y - p.y))
+			v.anim.play("Idle")
+			v.anim.get_animation("Idle").loop_mode = Animation.LOOP_LINEAR
+
+
+func _start_ending(good: bool) -> void:
+	if state == State.ENDING:
+		return
+	state = State.ENDING
+	hero.move_target = null
+	hud.show_prompt("", "", false)
+	hud.visible = false
+	minimap.visible = false
+	dialogue.visible = false
+	castle_shades.reset_all()
+	shades.reset_all()
+	if not good:
+		lantern.set_carried(false) # фонарь остался у трона
+	ending = Ending.new()
+	add_child(ending)
+	ending.begin(good, self, cam, env)
+	ending.finished.connect(func(): get_tree().reload_current_scene())
+
+
+func _process_ending(dt: float) -> void:
+	ending.update(dt)
+	Beacon.update_globals()
+	forest.update_forest(dt, hero.global_position, true)
+	swamp.update_swamp(dt, hero.global_position, beacons[2].lit)
+	mountains.update_mountains(dt, hero.global_position, 0.0, 1.0)
+	castle.update_castle(dt, true)
+	region_audio.update_layers(dt, ending.life())
+	sound.calm = ending.dawn
+	sound.mountain = 0.0
+	sound.update_sound(dt)
+	_drips.volume_db = -80.0
+	grade.set_shader_parameter("dawn", ending.dawn if ending.good else 0.12)
+	grade.set_shader_parameter("frost", 0.0)
+	grade.set_shader_parameter("fade", 1.0)
+	_moon.light_energy = 0.42 * (1.0 - ending.dawn)
+	RenderingServer.global_shader_parameter_set("wind_strength", 1.0)
+	if not ending.good:
+		Atmosphere.set_dawn(env, 0.1)
+
+
+## Вид от первого лица (тест): только в обычной игре; диалоги, маяки, финал — прежней камерой
+func _update_view_mode() -> void:
+	var fp := Settings.first_person and started and state == State.PLAY and not hero.riding
+	if fp != cam.first_person:
+		if fp:
+			cam.enter_first_person()
+		else:
+			cam.leave_first_person()
+		hero.visible = not fp
+		hero.instant_turn = fp
+		_mouse_raise = false
+	var want_mode := Input.MOUSE_MODE_CAPTURED if fp and get_window().has_focus() else Input.MOUSE_MODE_VISIBLE
+	if Input.mouse_mode != want_mode and not Args.has("autotest"):
+		Input.mouse_mode = want_mode
+
+
+func _unhandled_key_ending(e: InputEvent) -> bool:
+	if state == State.CUTSCENE and prologue and e is InputEventKey and e.pressed and not e.echo and e.physical_keycode in [KEY_ESCAPE, KEY_SPACE, KEY_ENTER]:
+		prologue.skip()
+		return true
+	if state == State.ENDING and e is InputEventKey and e.pressed and not e.echo and e.physical_keycode in [KEY_ESCAPE, KEY_SPACE, KEY_ENTER]:
+		ending.skip()
+		return true
+	return false
+
+
 ## Новая игра: стереть сохранение и перезапустить сцену
 func _restart() -> void:
 	SaveGame.reset()
+	SaveGame.skip_menu_once = true
 	get_tree().reload_current_scene()
 
 
@@ -920,7 +1302,7 @@ func _update_castle(dt: float) -> void:
 		CastleLayout.gate_open = true
 		if not _gate_announced and started:
 			_gate_announced = true
-			hud.toast("Где-то на юге, за мостом, с лязгом поднялась старая решётка.")
+			hud.toast(Tr.t("Где-то на юге, за мостом, с лязгом поднялась старая решётка."))
 			GameState.apply("quest:castle=active")
 	castle.update_castle(dt, CastleLayout.gate_open)
 	# подсказка у закрытых ворот
@@ -928,7 +1310,7 @@ func _update_castle(dt: float) -> void:
 	if not CastleLayout.gate_open and state == State.PLAY and _gate_hint_t <= 0.0:
 		if Vector2(hp.x - CastleLayout.GATE.x, hp.z - CastleLayout.GATE.y).length() < 4.5:
 			_gate_hint_t = 12.0
-			hud.toast("Решётка не поддаётся — будто её держит сама темнота. Горит маяков: %d из 4." % lit)
+			hud.toast(Tr.t("Решётка не поддаётся — будто её держит сама темнота. Горит маяков: %d из 4.") % lit)
 	# капли в пустых залах
 	var dv := _castle_f * (1.0 - beacons[4].radius / 60.0)
 	if dv > 0.02 and not _drips.playing and started:
@@ -940,6 +1322,15 @@ func _update_castle(dt: float) -> void:
 func _light_brazier(i: int) -> void:
 	mountains.light_brazier(i)
 	GameState.flags["brazier_%d" % i] = true
+	if GameState.quest("warm_road") == "":
+		GameState.apply("quest:warm_road=active")
+	var lit_n := 0
+	for k in mountains.braziers.size():
+		if mountains.braziers[k].lit:
+			lit_n += 1
+	if lit_n >= mountains.braziers.size() and GameState.quest("warm_road") == "active":
+		GameState.flags["warm_road"] = true
+		GameState.apply("quest:warm_road=done")
 	oil.level = maxf(0.0, oil.level - 0.04)
 	sound.sfx("ignite", 0.35, 1.3)
 	_save_progress()
@@ -953,21 +1344,22 @@ func _update_cold(dt: float) -> void:
 			_cold = move_toward(_cold, 0.0, dt * 0.3)
 		return
 	var hp := hero.global_position
-	var warm := mountains.warmth(hp)
+	var warm := 1.0 if interiors.inside() else mountains.warmth(hp)
 	var life := Beacon.restore_at(hp)
 	if warm > 0.3 or life > 0.5:
 		_cold = move_toward(_cold, 0.0, dt / 3.0)
 	elif _mtn_f > 0.4 and GameState.flags.get("has_lantern", false):
 		var altitude := clampf(hp.y / MountainLayout.PEAK, 0.0, 1.0)
-		_cold = minf(1.0, _cold + dt / 75.0 * (0.6 + altitude * 1.2) * _mtn_f)
+		var resist := (0.6 if GameState.flags.get("scarf", false) else 1.0) * (0.75 if GameState.flags.get("warm_road", false) else 1.0)
+		_cold = minf(1.0, _cold + dt / 75.0 * (0.6 + altitude * 1.2) * _mtn_f * resist)
 	else:
 		_cold = move_toward(_cold, 0.0, dt / 12.0)
 	if _cold > 0.5 and _cold_warned < 1:
 		_cold_warned = 1
-		hud.toast("Холод пробирает до костей. Фонарь дрожит — нужна жаровня.")
+		hud.toast(Tr.t("Холод пробирает до костей. Фонарь дрожит — нужна жаровня."))
 	elif _cold > 0.82 and _cold_warned < 2:
 		_cold_warned = 2
-		hud.toast("Пальцы немеют… Огонь вот-вот погаснет.")
+		hud.toast(Tr.t("Пальцы немеют… Огонь вот-вот погаснет."))
 	elif _cold < 0.3:
 		_cold_warned = 0
 	if _cold >= 1.0:
@@ -983,7 +1375,7 @@ func _update_bog(dt: float) -> void:
 	if bog > 0.5:
 		if not _bog_warned:
 			_bog_warned = true
-			hud.toast("Трясина! Назад, пока не затянуло…")
+			hud.toast(Tr.t("Трясина! Назад, пока не затянуло…"))
 		_bog_t += dt
 		hero.slow = 0.35
 		hero.sink = minf(0.65, _bog_t * 0.14)
@@ -998,6 +1390,287 @@ func _update_bog(dt: float) -> void:
 
 
 ## Карта: открываем исследованное, ставим метки
+# ── этап 6: дома, волны Пелены, цель, добрые дела ─────────────
+
+func _build_interiors() -> void:
+	interiors = Interiors.new()
+	add_child(interiors)
+	var door := func(node: Node3D, extra := 0.9) -> Array:
+		var size: Vector3 = node.get_meta("size")
+		var yaw := node.rotation.y
+		var d := Vector2(sin(yaw), cos(yaw))
+		var c := Vector2(node.global_position.x, node.global_position.z)
+		var p := c + d * (size.z * 0.5 + extra)
+		return [_ground3(p), d]
+	for h in village.houses:
+		if h.id == "elder_house":
+			var dr: Array = door.call(h.node)
+			interiors.add_room("elder", Tr.t("дом Ольдриха"), "elder", dr[0], dr[1])
+		elif h.m == "House_2":
+			var dr: Array = door.call(h.node)
+			interiors.add_room("lia", Tr.t("дом Лии"), "lia", dr[0], dr[1])
+	if forest.hut_node:
+		var dr: Array = door.call(forest.hut_node)
+		interiors.add_room("vale", Tr.t("хижина Вейла"), "herbal", dr[0], dr[1])
+	if swamp.hut_node:
+		var dr: Array = door.call(swamp.hut_node)
+		interiors.add_room("korney", Tr.t("хижина Корнея"), "fisher", dr[0], dr[1])
+	var od := MountainLayout.OBS + Vector2(-2.6, -2.2 + 2.42 + 0.9)
+	interiors.add_room("obs", Tr.t("обсерватория"), "study", _ground3(od), Vector2(0, 1))
+	colliders.append_array(interiors.colliders)
+	for r in interiors.rooms:
+		(r.root as Node3D).visible = false
+
+
+## Переход через дверь: затемнение → перенос → проявление
+func _door_go(to: int) -> void:
+	_door_to = to
+	_door_t = 0.0
+	hero.move_target = null
+	sound.sfx("clink", 0.18, 0.6)
+
+
+func _update_door(dt: float) -> void:
+	if _door_t < 0.0:
+		return
+	var before := _door_t
+	_door_t += dt
+	if before < 0.35 and _door_t >= 0.35:
+		if _door_to >= 0:
+			_enter_room(_door_to)
+		else:
+			_leave_room()
+	_faint_mult = (1.0 - Terrain.ss(0.0, 0.35, _door_t)) if _door_t < 0.35 else Terrain.ss(0.35, 0.85, _door_t)
+	if _door_t >= 0.85:
+		_door_t = -1.0
+		_faint_mult = 1.0
+
+
+func _enter_room(i: int) -> void:
+	var r: Dictionary = interiors.rooms[i]
+	interiors.current = i
+	(r.root as Node3D).visible = true
+	hero.room = r.rect
+	hero.room_y = (r.center as Vector3).y
+	hero.global_position = (r.exit_in as Vector3) + Vector3(0, 0, -0.7)
+	hero.facing = PI
+	hero.rotation.y = PI
+	cam.look_yaw = 0.0
+	cam.look_pitch = deg_to_rad(-6.0)
+	_last_hero_pos = hero.global_position
+	cam.zoom = 0.62
+	cam.snap(hero.global_position)
+	interiors.set_view(cam.first_person)
+	if veil.active() or veil.warning():
+		hud.toast(Tr.t("Здесь Пелена не достанет. Переждём у огня."))
+
+
+func _leave_room() -> void:
+	var r: Dictionary = interiors.rooms[interiors.current]
+	(r.root as Node3D).visible = false
+	interiors.current = -1
+	hero.room = Rect2()
+	hero.global_position = r.door_out
+	hero.facing = r.out_yaw
+	hero.rotation.y = r.out_yaw
+	cam.look_yaw = float(r.out_yaw) + PI
+	_last_hero_pos = hero.global_position
+	cam.zoom = 1.0
+	cam.snap(hero.global_position)
+
+
+## 0..1 — насколько герой укрыт от волны: дом, живой огонь рядом, зажжённый маяк
+func _shelter() -> float:
+	if interiors.inside():
+		return 1.0
+	var hp := hero.global_position
+	var best := 0.0
+	for i in village.lamps.size():
+		if village.lamps[i].lit:
+			var d := Vector2(hp.x, hp.z).distance_to(Vector2(village.lamp_pos(i).x, village.lamp_pos(i).z))
+			best = maxf(best, 1.0 - Terrain.ss(2.6, 4.2, d))
+	best = maxf(best, clampf(mountains.warmth(hp) * 1.4, 0.0, 1.0))
+	for b in beacons:
+		if b.lit:
+			best = maxf(best, 1.0 - Terrain.ss(7.0, 10.0, Vector2(hp.x - b.position.x, hp.z - b.position.z).length()))
+	return best
+
+
+## Куда бежать от волны: ближайшая дверь, горящий фонарь, жаровня или маяк
+func _nearest_shelter() -> Variant:
+	var hp := hero.global_position
+	var best: Variant = null
+	var best_d := 70.0
+	var cand: Array = []
+	for r in interiors.rooms:
+		cand.append(r.door_out)
+	for i in village.lamps.size():
+		if village.lamps[i].lit:
+			cand.append(village.lamp_pos(i))
+	for bz in mountains.braziers:
+		if bz.lit:
+			cand.append(bz.pos)
+	for b in beacons:
+		if b.lit:
+			cand.append(b.position)
+	for c in cand:
+		var p: Vector3 = c
+		var d := Vector2(p.x - hp.x, p.z - hp.z).length()
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
+
+
+func _on_veil_event(ev: String) -> void:
+	match ev:
+		"warn":
+			if veil.waves == 0:
+				hud.toast(Tr.t("С гор накатывает волна Пелены! Укройся в доме (E у двери) или у живого огня."))
+			else:
+				hud.toast(Tr.t("Гул с гор… Пелена надвигается."))
+		"wave":
+			hud.toast(Tr.t("Пелена накрыла землю. Масло тает, свет сжимается."))
+		"calm":
+			hud.toast(Tr.t("Пелена отступила."))
+
+
+## Пепел, который несёт волна Пелены (летит вокруг героя)
+func _make_ash() -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.amount = 500 if Quality.level != "low" else 220
+	p.lifetime = 4.0
+	p.preprocess = 2.0
+	p.visibility_aabb = AABB(Vector3(-20, -6, -20), Vector3(40, 16, 40))
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(14, 5, 14)
+	pm.direction = Vector3(1, -0.2, 0.4)
+	pm.spread = 25.0
+	pm.initial_velocity_min = 1.5
+	pm.initial_velocity_max = 3.5
+	pm.gravity = Vector3(0.8, -0.35, 0.3)
+	pm.turbulence_enabled = true
+	pm.turbulence_noise_strength = 1.2
+	pm.scale_min = 0.5
+	pm.scale_max = 1.3
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(0.07, 0.07)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.albedo_color = Color(0.62, 0.57, 0.53, 0.6)
+	q.material = m
+	p.draw_pass_1 = q
+	p.emitting = false
+	return p
+
+
+## Пелена в воздухе: густой пепельный туман; в доме — тёплый полумрак без тумана
+func _apply_veil_env(inside: bool) -> void:
+	var e := env.environment
+	_ash.emitting = _veil_vis > 0.08
+	_ash.amount_ratio = clampf(_veil_vis, 0.05, 1.0)
+	_ash.global_position = hero.global_position + Vector3(0, 2.0, 0)
+	if inside:
+		e.ambient_light_color = Color(0.32, 0.22, 0.16)
+		e.ambient_light_energy = 0.35
+		e.fog_density = 0.0
+		e.background_color = Color(0, 0, 0)
+		if e.volumetric_fog_enabled:
+			e.volumetric_fog_density = 0.0
+		_moon.light_energy = 0.0
+		grade.set_shader_parameter("dawn", 0.0)
+		return
+	var v := _veil_vis
+	if v < 0.002:
+		return
+	e.fog_density += 0.035 * v
+	e.fog_light_color = e.fog_light_color.lerp(Color(0.2, 0.16, 0.14), v * 0.85)
+	e.ambient_light_color = e.ambient_light_color.lerp(Color(0.36, 0.3, 0.28), v * 0.6)
+	if e.volumetric_fog_enabled:
+		e.volumetric_fog_density += 0.012 * v
+		e.volumetric_fog_albedo = e.volumetric_fog_albedo.lerp(Color(0.75, 0.68, 0.62), v)
+	_moon.light_energy *= 1.0 - 0.6 * v
+
+
+## «Что сейчас» и метка цели (пересчёт 4 раза в секунду)
+func _update_guide(dt: float, inside: bool) -> void:
+	goal_hud.hero_pos = hero.global_position
+	goal_hud.shown = started and state in [State.PLAY, State.FERRY] and _door_t < 0.0
+	_guide_t -= dt
+	if _guide_t > 0.0:
+		return
+	_guide_t = 0.25
+	var g := Guide.goal(self)
+	var urgent := false
+	if inside:
+		var r: Dictionary = interiors.rooms[interiors.current]
+		g = {text = (Tr.t("Пелена снаружи. Переждём у огня.") if veil.active() or veil.warning() else Tr.t("Ты в доме: ") + r.title + Tr.t(". E у двери — выйти.")), pos = null}
+	elif (veil.warning() or veil.active()) and _shelter() < 0.8:
+		urgent = true
+		var left := veil.seconds_left()
+		var t := Tr.t("Пелена надвигается! Укройся в доме или у огня") if veil.warning() else Tr.t("Пелена! Укройся в доме или у живого огня")
+		if left > 0:
+			t += " (%d %s)" % [left, Tr.t("с")]
+		g = {text = t, pos = _nearest_shelter()}
+	elif veil.active():
+		g = {text = Tr.t("Ты в укрытии. Пережди волну."), pos = null}
+	goal_hud.text = g.text
+	goal_hud.target = g.pos
+	goal_hud.urgent = urgent
+
+
+## Фонарщик зажигает фонарь на столбе
+func _light_lamp(i: int) -> void:
+	village.set_lamp(i, true)
+	GameState.flags["lamp_%d" % i] = true
+	oil.level = maxf(0.0, oil.level - 0.02)
+	sound.sfx("ignite", 0.3, 1.5)
+	var n := 0
+	for k in village.lamps.size():
+		if village.lamps[k].lit:
+			n += 1
+	if n >= village.lamps.size():
+		if GameState.quest("village_lamps") != "done":
+			GameState.apply("quest:village_lamps=done")
+			oil.add(0.5)
+	else:
+		hud.toast(Tr.t("Фонарь горит: %d из %d") % [n, village.lamps.size()])
+
+
+## Письма: когда все три доставлены — задание выполнено
+func _check_letters() -> void:
+	for id in ["letter_mara_done", "letter_borta_done", "letter_lia_done"]:
+		if not GameState.flags.get(id, false):
+			return
+	GameState.apply("quest:post_letters=done")
+	_save_progress()
+
+
+## Предыстория: мир живёт своей жизнью, камеру ведёт Prologue
+func _process_cutscene(dt: float) -> void:
+	if prologue:
+		prologue.update(dt)
+	Beacon.update_globals()
+	RenderingServer.global_shader_parameter_set("hero_pos", hero.global_position)
+	RenderingServer.global_shader_parameter_set("lantern_pos", Vector3(0, -100, 0))
+	lantern.set_carried(false)
+	forest.update_forest(dt, hero.global_position, beacons[1].lit)
+	swamp.update_swamp(dt, hero.global_position, beacons[2].lit)
+	mountains.update_mountains(dt, hero.global_position, 0.0, 0.0)
+	sound.wick = 0.0
+	sound.mountain = 0.3
+	sound.update_sound(dt)
+	region_audio.update_layers(dt, {"village": 0.0, "forest": 0.0, "swamp": 0.0, "mountains": 0.0})
+	Atmosphere.set_dawn(env, 0.0)
+	grade.set_shader_parameter("fade", 1.0)
+	grade.set_shader_parameter("dawn", 0.0)
+	grade.set_shader_parameter("frost", 0.0)
+
+
 func _update_map() -> void:
 	var hp := Vector2(hero.global_position.x, hero.global_position.z)
 	MapData.update(hp)
@@ -1026,10 +1699,13 @@ func _update_map() -> void:
 		var vp := Vector2(v.global_position.x, v.global_position.z)
 		if DialogueRunner.has_news(v.id) and MapData.explored(vp):
 			marks.append({pos = vp, kind = "npc", r = 0.0})
+	if goal_hud and goal_hud.target != null:
+		var gt: Vector3 = goal_hud.target
+		marks.append({pos = Vector2(gt.x, gt.z), kind = "goal", r = 0.0})
 	minimap.markers = marks
 	minimap.hero = hp
 	minimap.facing = hero.facing
-	minimap.fwd = Vector2(-sin(cam.yaw), -cos(cam.yaw))
+	minimap.fwd = Vector2(-sin(cam.view_yaw()), -cos(cam.view_yaw()))
 	minimap.set_shown(started and state in [State.PLAY, State.LIGHTING, State.MAP, State.FERRY])
 	minimap.update_map(bdata)
 
@@ -1169,10 +1845,253 @@ func _auto_talk(id: String, picks: Array, dir: String, shot_prefix: String) -> v
 			dialogue._next()
 
 
+func _stage6(dir: String) -> void:
+	Settings.first_person = Args.has("fp")
+	await _wait(1.5)
+	await _shot(dir, "a0-start-goal.png")
+	GameState.flags["has_lantern"] = true
+	GameState.apply("quest:get_lantern=done")
+	await _wait(1.0)
+	# двери снаружи
+	for r in interiors.rooms:
+		hero.global_position = r.door_out
+		hero.facing = r.out_yaw + PI
+		cam.zoom = 1.0
+		cam.snap(hero.global_position)
+		await _wait(1.6)
+		await _shot(dir, "b-door-%s.png" % r.id)
+	# фонари
+	var lp := village.lamp_pos(0)
+	hero.global_position = lp + Vector3(1.0, 0, 1.0)
+	cam.snap(hero.global_position)
+	await _wait(1.0)
+	await _shot(dir, "c0-lamp-dark.png")
+	_interact()
+	await _wait(2.0)
+	await _shot(dir, "c1-lamp-lit.png")
+	for i in village.lamps.size():
+		if not village.lamps[i].lit:
+			_light_lamp(i)
+	await _wait(2.0)
+	hero.global_position = _ground3(VillageLayout.world(Vector2(0, 3)))
+	cam.zoom = 1.6
+	await _wait(2.0)
+	await _shot(dir, "c2-village-lamps.png")
+	cam.zoom = 1.0
+	print("lamps quest=", GameState.quest("village_lamps"))
+	# дома изнутри
+	for i in interiors.rooms.size():
+		hero.global_position = interiors.rooms[i].door_out
+		await _wait(0.3)
+		_door_go(i)
+		await _wait(1.6)
+		await _shot(dir, "d-room-%s.png" % interiors.rooms[i].id)
+		Settings.first_person = true
+		await _wait(1.0)
+		await _shot(dir, "d-room-%s-fp.png" % interiors.rooms[i].id)
+		Settings.first_person = Args.has("fp")
+		hero.global_position = interiors.rooms[i].exit_in
+		await _wait(0.3)
+		_door_go(-1)
+		await _wait(1.2)
+	print("after rooms inside=", interiors.inside(), " room=", hero.room)
+	# волна Пелены
+	beacons[0].set_lit_instant()
+	hero.global_position = _ground3(VillageLayout.world(Vector2(12, 12)))
+	cam.snap(hero.global_position)
+	veil.force_warn(4.0)
+	await _wait(2.0)
+	await _shot(dir, "e0-warn.png")
+	await _wait(9.0)
+	await _shot(dir, "e1-wave-village.png")
+	hero.global_position = _ground3(Vector2(18, -14))
+	cam.snap(hero.global_position)
+	await _wait(5.0)
+	var o0 := oil.level
+	await _wait(3.0)
+	print("wave: strength=%.2f exposure=%.2f oil drop/3s=%.3f" % [veil.strength, _exposure, o0 - oil.level])
+	await _shot(dir, "e2-wave-open.png")
+	hero.global_position = village.lamp_pos(2) + Vector3(1.2, 0, 0.6)
+	await _wait(2.0)
+	print("near lamp: shelter=%.2f exposure=%.2f" % [_shelter(), _exposure])
+	await _shot(dir, "e3-wave-lamp.png")
+	hero.global_position = interiors.rooms[0].door_out
+	await _wait(0.3)
+	_door_go(0)
+	await _wait(2.0)
+	await _shot(dir, "e4-wave-inside.png")
+	hero.global_position = interiors.rooms[0].exit_in
+	_door_go(-1)
+	await _wait(1.0)
+	# ягнёнок
+	GameState.apply("quest:lia_lamb=active")
+	var lb := deeds.lamb.global_position
+	hero.global_position = _ground3(Vector2(lb.x + 1.5, lb.z + 1.2))
+	cam.snap(hero.global_position)
+	await _wait(1.5)
+	await _shot(dir, "f0-lamb.png")
+	var nit: Variant = _nearest_interactable()
+	print("nearest=", nit.pc if nit != null else "none", " lamb_dist=", hero.global_position.distance_to(deeds.lamb.global_position), " active=", deeds.lamb_active())
+	_interact()
+	print("following=", deeds.lamb_following)
+	var pen := VillageLayout.world(VillageLayout.PEN_CENTER + Vector2(3.5, 0))
+	var from := Vector2(hero.global_position.x, hero.global_position.z)
+	var steps := int(from.distance_to(pen) / 0.5)
+	for k in steps:
+		var q := from.lerp(pen, float(k + 1) / steps)
+		hero.global_position = _ground3(q)
+		hero.facing = atan2(pen.x - from.x, pen.y - from.y)
+		await _wait(0.22)
+		if k == steps / 2:
+			await _shot(dir, "f1-lamb-follow.png")
+		if GameState.flags.get("lamb_home", false):
+			break
+	await _wait(1.0)
+	print("lamb_home=", GameState.flags.get("lamb_home", false))
+	await _shot(dir, "f2-lamb-home.png")
+	# Лия и письма
+	GameState.apply("give:post_bag")
+	await _wait(0.5)
+	print("letters=", GameState.items)
+	await _auto_talk("lia", [], dir, "g0-lia")
+	print("lia: quest lamb=", GameState.quest("lia_lamb"), " scarf=", GameState.flags.get("scarf", false), " letter=", GameState.flags.get("letter_lia_done", false))
+	await _auto_talk("lia", [], dir, "g1-lia2")
+	await _auto_talk("mara", [], dir, "g2-mara")
+	print("mara: bread=", GameState.quest("mara_bread"), " letter=", GameState.flags.get("letter_mara_done", false))
+	await _auto_talk("borta", [], dir, "g3-borta")
+	print("post=", GameState.quest("post_letters"), " items=", GameState.items)
+	# лунная трава
+	GameState.apply("quest:borta_herbs=active")
+	var hs := Deeds.snap(Deeds.HERB_SPOTS[0])
+	hero.global_position = _ground3(hs + Vector2(1.5, 1.5))
+	cam.snap(hero.global_position)
+	await _wait(1.5)
+	await _shot(dir, "h0-herb.png")
+	print("AUTOTEST DONE fps=", Engine.get_frames_per_second())
+	get_tree().quit()
+
+
+func _menu_look() -> void:
+	var dir := Args.get_value("menulook")
+	DirAccess.make_dir_recursive_absolute(dir)
+	await _wait(5.0)
+	await _shot(dir, "menu.png")
+	title._settings.open()
+	await _wait(1.0)
+	await _shot(dir, "settings.png")
+	get_tree().quit()
+
+
 func _autotest(dir: String) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	await _wait(0.5)
 	title.start()
+	if Args.has("doorlook"):
+		Settings.first_person = true
+		for r in interiors.rooms:
+			hero.global_position = (r.door_out as Vector3) + Vector3(sin(r.out_yaw), 0, cos(r.out_yaw)) * 1.5
+			cam.look_yaw = float(r.out_yaw)
+			cam.look_pitch = deg_to_rad(-5.0)
+			await _wait(1.5)
+			await _shot(dir, "door-%s.png" % r.id)
+		get_tree().quit()
+		return
+	if Args.has("wavelook"):
+		Settings.first_person = Args.has("fp")
+		GameState.flags["has_lantern"] = true
+		beacons[0].set_lit_instant()
+		var at := Args.get_value("wavelook_at", "forest")
+		var spot := ForestLayout.node("E") + Vector2(3, 6) if at == "forest" else SwampLayout.WALK[3]
+		hero.global_position = _ground3(spot)
+		cam.snap(hero.global_position)
+		await _wait(3.0)
+		await _shot(dir, "w0-calm.png")
+		veil.force_warn(6.0)
+		await _wait(4.0)
+		await _shot(dir, "w1-warn.png")
+		await _wait(10.0)
+		var o0 := oil.level
+		await _wait(4.0)
+		print("wave: strength=%.2f exposure=%.2f vis=%.2f oil drop/4s=%.3f" % [veil.strength, _exposure, _veil_vis, o0 - oil.level])
+		await _shot(dir, "w2-wave.png")
+		Input.action_press("raise")
+		await _wait(1.5)
+		await _shot(dir, "w3-wave-raise.png")
+		Input.action_release("raise")
+		get_tree().quit()
+		return
+	if Args.has("stage6test"):
+		await _stage6(dir)
+		return
+	if Args.has("prologuetest"):
+		for k in 7:
+			await _wait(6.5)
+			await _shot(dir, "p%d.png" % k)
+		await _wait(8.0)
+		await _shot(dir, "p-after.png")
+		print("state=", state, " seen=", GameState.flags.get("prologue_seen", false))
+		get_tree().quit()
+		return
+	if Args.has("hutlook"):
+		await _wait(1.0)
+		GameState.flags["has_lantern"] = true
+		Settings.first_person = false
+		for k in [["hut-top", SwampLayout.HUT + Vector2(0, 2.0), 1.8], ["hut-walk", Vector2(64.0, -8.2), 1.3], ["walk-gap1", SwampLayout.GAPS[0], 0.9], ["walk-gap2", SwampLayout.GAPS[1], 0.9]]:
+			hero.global_position = _ground3(k[1] + Vector2(0, 0.0))
+			cam.zoom = k[2]
+			await _wait(2.5)
+			await _shot(dir, "%s.png" % k[0])
+		Settings.first_person = true
+		for k in [["fp-hut", Vector2(62.0, -7.6), SwampLayout.HOUSE], ["fp-hut2", Vector2(72.5, -12.0), SwampLayout.HOUSE + Vector2(-2, 0)]]:
+			hero.global_position = _ground3(k[1])
+			var d: Vector2 = k[2] - k[1]
+			cam.look_yaw = atan2(-d.x, -d.y)
+			cam.look_pitch = deg_to_rad(-12.0)
+			await _wait(2.0)
+			await _shot(dir, "%s.png" % k[0])
+		get_tree().quit()
+		return
+	if Args.has("fptest"):
+		await _wait(1.0)
+		GameState.flags["has_lantern"] = true
+		Settings.first_person = true
+		var vc := VillageLayout.world(Vector2(0, 0))
+		var spots := [
+			["village", vc + Vector2(0, 6), vc],
+			["village-walk", vc + Vector2(-6, 2), vc + Vector2(-12, -6)],
+			["forest", ForestLayout.CENTER + Vector2(0, 26), ForestLayout.CENTER],
+			["swamp", SwampLayout.WALK[2], SwampLayout.WALK[4]],
+			["stairs", MountainLayout.STAIRS[0], MountainLayout.STAIRS[1]],
+			["castle", CastleLayout.GATE + Vector2(0, -6), CastleLayout.CENTER],
+			["hall", CastleLayout.THRONE + Vector2(0, 9), CastleLayout.THRONE],
+		]
+		for sp in spots:
+			var from: Vector2 = sp[1]
+			var to: Vector2 = sp[2]
+			hero.global_position = _ground3(from)
+			var d := to - from
+			cam.look_yaw = atan2(-d.x, -d.y)
+			cam.look_pitch = deg_to_rad(-6.0)
+			await _wait(2.5)
+			await _shot(dir, "fp-%s.png" % sp[0])
+			if sp[0] == "village-walk":
+				Input.action_press("move_up")
+				Input.action_press("raise")
+				await _wait(1.6)
+				await _shot(dir, "fp-%s-raise.png" % sp[0])
+				Input.action_release("move_up")
+				Input.action_release("raise")
+			if sp[0] == "stairs":
+				for i in range(1, 5):
+					var pt: Vector2 = MountainLayout.STAIRS[i]
+					hero.move_target = Vector3(pt.x, 0, pt.y)
+					var dd := pt - Vector2(hero.global_position.x, hero.global_position.z)
+					cam.look_yaw = atan2(-dd.x, -dd.y)
+					await _wait(dd.length() / 2.0 + 1.0)
+					await _shot(dir, "fp-stairs-%d.png" % i)
+		print("AUTOTEST DONE fps=", Engine.get_frames_per_second())
+		get_tree().quit()
+		return
 	if Args.has("villagetest"):
 		await _wait(1.0)
 		cam.zoom = float(Args.get_value("zoom", "1.0"))
@@ -1218,6 +2137,41 @@ func _autotest(dir: String) -> void:
 			if v.id == "king":
 				k = v
 		print("king at ", k.global_position, " seat ", castle.throne_seat, " anim ", k.anim.current_animation)
+		get_tree().quit()
+		return
+	if Args.has("finaltest"):
+		var good := Args.get_value("finaltest") != "bad"
+		await _wait(1.5)
+		GameState.flags["has_lantern"] = true
+		GameState.flags["knows_truth"] = true
+		for i in 4:
+			beacons[i].set_lit_instant()
+		await _wait(1.0)
+		hero.global_position = Vector3(0, Terrain.height_at(0, 96.5), 96.5)
+		castle_shades.reset_all()
+		await _wait(1.5)
+		await _auto_talk("king", [0], dir, "e00-king-first")
+		print("king_met=", GameState.flags.get("king_met", false))
+		await _auto_talk("king", [1, 0, 0] if good else [0, 1, 1], dir, "e01-king-final")
+		print("final flags: ready=", GameState.flags.get("castle_final_ready", false), " bad=", GameState.flags.get("ending_bad", false), " state=", state)
+		if good:
+			var b5 := beacons[4]
+			hero.global_position = b5.position + Vector3(0, 0, 3.0)
+			hero.global_position.y = Terrain.height_at(hero.global_position.x, hero.global_position.z)
+			await _wait(1.5)
+			await _shot(dir, "e02-at-beacon.png")
+			print("prompt: ", _nearest_interactable().pc if _nearest_interactable() != null else "none")
+			_interact()
+			await _wait(4.0)
+			await _shot(dir, "e03-fifth-fire.png")
+			await _wait(4.0)
+		print("ending started: ", state == State.ENDING)
+		for k in 9:
+			await _wait(6.5)
+			await _shot(dir, "e1%d-ending.png" % k)
+		await _wait(8.0)
+		await _shot(dir, "e20-credits.png")
+		print("AUTOTEST DONE fps=", Engine.get_frames_per_second())
 		get_tree().quit()
 		return
 	if Args.has("castletest"):

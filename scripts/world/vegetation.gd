@@ -439,7 +439,7 @@ func build_swamp(cast_shadows: bool) -> void:
 				continue
 			if SwampLayout.walk_dist(x, z) < 1.6 or Vector2(x, z).distance_to(SwampLayout.pier_a()) < 4.0 or Vector2(x, z).distance_to(SwampLayout.pier_b()) < 4.0:
 				continue
-			if Vector2(x, z).distance_to(SwampLayout.BEACON) < SwampLayout.BEACON_R + 0.5 or Vector2(x, z).distance_to(SwampLayout.HUT) < 3.5:
+			if Vector2(x, z).distance_to(SwampLayout.BEACON) < SwampLayout.BEACON_R + 0.5 or Vector2(x, z).distance_to(SwampLayout.HUT) < 3.5 or Vector2(x, z).distance_to(SwampLayout.HOUSE) < 3.5:
 				continue
 			var file: String = kind.files[_rng.randi() % kind.files.size()]
 			var model: Dictionary = _models[file]

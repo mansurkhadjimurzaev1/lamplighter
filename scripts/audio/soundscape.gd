@@ -129,7 +129,7 @@ func update_sound(dt: float) -> void:
 		return
 	_t += dt
 	_master = minf(1.0, _master + dt / 4.0)
-	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(0.0001, _master * 0.9)))
+	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(0.0001, _master * 0.9 * Settings.volume)))
 	var t := _t
 	var gust := 0.5 + 0.5 * sin(t * 0.11) * sin(t * 0.047 + 1.3)
 	var g2 := maxf(0.0, sin(t * 0.07 + 2.0) * sin(t * 0.19))

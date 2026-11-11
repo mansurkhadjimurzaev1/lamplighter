@@ -5,6 +5,7 @@ extends Node3D
 
 const WISP_FAR := 14.0
 
+var hut_node: Node3D # хижина Корнея (дверь — вход в дом)
 var colliders: Array[Vector3] = []
 var probe: ReflectionProbe
 var boat: Node3D
@@ -107,11 +108,7 @@ func _boardwalks() -> void:
 				for g in SwampLayout.GAPS:
 					if p.distance_to(g) < 0.9:
 						gap = true
-				# прогнившие доски: часть выпала, часть перекошена
-				if gap and _rng.randf() < 0.7:
-					continue
-				if _rng.randf() < 0.06:
-					continue
+				# прогнившие доски не выпадают (иначе кажется, что идёшь по воздуху) — только перекошены
 				var y := SwampLayout.deck_height(p.x, p.y) - 0.04
 				var basis := Basis(Vector3.UP, yaw)
 				basis = basis.rotated(basis.z, _rng.randf_range(-0.06, 0.06) + (0.25 if gap else 0.0))
@@ -300,21 +297,22 @@ func _update_wisps(dt: float, hero: Vector2, lit: bool) -> void:
 # ── хижина паромщика ────────────────────────────────────────
 
 func _hut() -> void:
-	var p := SwampLayout.HUT + Vector2(-1.5, 1.5)
+	var p := SwampLayout.HOUSE
 	var hut := Props.make("village/House_3.glb", 4.2)
 	add_child(hut)
+	hut_node = hut
 	hut.global_position = Vector3(p.x, _h(p) - 0.1, p.y)
 	hut.rotation.y = deg_to_rad(-120)
 	Props.settle(hut)
 	colliders.append(Vector3(p.x, p.y, 2.0))
 	for k in 3:
-		var q := SwampLayout.HUT + Vector2(1.8 + k * 0.6, 2.8 - k * 0.3)
+		var q := SwampLayout.HUT + Vector2(2.6 + k * 0.6, 1.4 + k * 0.2)
 		var b := Props.make("village/Barrel.glb", 0.85)
 		add_child(b)
 		b.global_position = Vector3(q.x, _h(q), q.y)
 		b.rotation.y = _rng.randf() * TAU
 		Props.settle(b)
-	colliders.append(Vector3(SwampLayout.HUT.x + 2.4, SwampLayout.HUT.y + 2.5, 0.8))
+	colliders.append(Vector3(SwampLayout.HUT.x + 3.2, SwampLayout.HUT.y + 1.6, 0.8))
 	# сеть на жердях
 	var net := MeshInstance3D.new()
 	var nm := QuadMesh.new()
@@ -340,7 +338,7 @@ func _hut() -> void:
 	jmat.emission_energy_multiplier = 3.0
 	jar.material_override = jmat
 	add_child(jar)
-	var jp := SwampLayout.HUT + Vector2(0.4, 0.6)
+	var jp := SwampLayout.HUT + Vector2(-0.6, 1.4)
 	jar.global_position = Vector3(jp.x, _h(jp) + 1.0, jp.y)
 	var jl := OmniLight3D.new()
 	jl.light_color = Color(0.5, 0.95, 0.6)

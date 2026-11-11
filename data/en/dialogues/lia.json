@@ -1,0 +1,203 @@
+{
+	"name": "Lia",
+	"news": [
+		"quest:lia_sun!=active & quest:lia_sun!=done",
+		"quest:lia_sun=active & item:flower",
+		"item:letter_lia",
+		"flag:lamb_home & quest:lia_lamb=active",
+		"flag:has_lantern & quest:lia_sun=active & quest:lia_lamb!=active & quest:lia_lamb!=done",
+		"flag:has_lantern & quest:lia_sun=done & quest:lia_lamb!=active & quest:lia_lamb!=done"
+	],
+	"entries": [
+		{
+			"if": "item:letter_lia",
+			"node": "letter"
+		},
+		{
+			"if": "flag:lamb_home & quest:lia_lamb=active",
+			"node": "lamb_back"
+		},
+		{
+			"if": "flag:has_lantern & quest:lia_lamb!=active & quest:lia_lamb!=done & quest:lia_sun=done",
+			"node": "lamb_ask"
+		},
+		{
+			"if": "quest:lia_sun=done",
+			"node": "done"
+		},
+		{
+			"if": "quest:lia_sun=active & item:flower",
+			"node": "give"
+		},
+		{
+			"if": "flag:has_lantern & quest:lia_lamb!=active & quest:lia_lamb!=done & quest:lia_sun=active",
+			"node": "lamb_ask"
+		},
+		{
+			"if": "quest:lia_sun=active & quest:light_beacon=done",
+			"node": "lighter"
+		},
+		{
+			"if": "quest:lia_sun=active",
+			"node": "waiting"
+		},
+		{
+			"if": "true",
+			"node": "first"
+		}
+	],
+	"nodes": {
+		"first": {
+			"text": "Grandpa lamplighter! Grandpa! Is it true there used to be a sun? Right above the roofs?",
+			"choices": [
+				{
+					"text": "It's true. There was.",
+					"next": "what"
+				},
+				{
+					"text": "Honestly? I barely remember it myself.",
+					"do": [
+						"flag:lia_honest"
+					],
+					"next": "honest"
+				}
+			]
+		},
+		"honest": {
+			"text": "Oh. You're the first grown-up to say that. Everyone else says \"you'll understand when you're older\". I keep getting older and I still don't understand.",
+			"next": "what"
+		},
+		"what": {
+			"text": [
+				"What's it like? Mama says it's warm. Borta says it's like the fire in his forge, only huge-huge and far-far away.",
+				"And Mara says the sun makes the grass smell. How can grass smell from a fire?"
+			],
+			"choices": [
+				{
+					"text": "It's like a gold coin, only alive.",
+					"next": "coin"
+				},
+				{
+					"text": "I can't describe it. But I'll try to bring it back.",
+					"next": "return"
+				}
+			]
+		},
+		"coin": {
+			"text": "A coin… Mara has an old one. It's cold. So the sun isn't like a coin. You're making it up, aren't you?",
+			"next": "ask"
+		},
+		"return": {
+			"text": "Really-really? You're not making it up?",
+			"next": "ask"
+		},
+		"ask": {
+			"text": "Then… bring me a little piece of it. The tiniest one. I'll hide it under my pillow and then I'll know what it's like.",
+			"do": [
+				"quest:lia_sun=active",
+				"save"
+			],
+			"next": "end"
+		},
+		"waiting": {
+			"text": "I'm waiting here. I draw while I wait. Here's a circle… and after that I don't know what to draw.",
+			"next": "end"
+		},
+		"lighter": {
+			"text": "Oh, it's lighter! I can even see my hands on the square! Did you do that? Did you bring a piece of the sun? Maybe it's lying near the beacon?",
+			"next": "end"
+		},
+		"give": {
+			"text": "This… is for me? It's warm. Really warm. And it smells… like grass! Mara wasn't lying!",
+			"choices": [
+				{
+					"text": "It's the first flower by the beacon.",
+					"next": "give2"
+				},
+				{
+					"text": "The sun is still far. But this is the beginning.",
+					"next": "give2"
+				}
+			]
+		},
+		"give2": {
+			"text": [
+				"So the sun smells like grass. I knew it. Well, almost knew.",
+				"Wait! Here. This is my sun — I drew it. Take it. When you bring back the real one, we'll compare. Just don't laugh if mine is better."
+			],
+			"do": [
+				"take:flower",
+				"quest:lia_sun=done",
+				"note:lia_drawing",
+				"save"
+			],
+			"next": "end"
+		},
+		"done": {
+			"text": "I put the flower in a cup of water. It stands on the windowsill. Mama says now a little piece of morning lives in our house.",
+			"next": "done_honest"
+		},
+		"done_honest": {
+			"text": "When the sun comes back, I'll be the first one outside. Well, after you.",
+			"alt": {
+				"if": "flag:lia_honest",
+				"text": "And you're honest. You said you didn't remember the sun. So when you say it will come back — I'll believe you."
+			},
+			"next": "end"
+		},
+		"lamb_ask": {
+			"text": [
+				"Grandpa lamplighter… Little Star ran away. My lamb, the little one with a white spot on her forehead.",
+				"The lamp by the pen went out, she got scared of the dark and slipped through the gate. I heard her crying — up north, where the road goes into the forest. And I'm not allowed to go there alone."
+			],
+			"choices": [
+				{
+					"text": "I'll find her. I promise.",
+					"do": [
+						"quest:lia_lamb=active",
+						"save"
+					],
+					"next": "lamb_ok"
+				},
+				{
+					"text": "The dark won't hurt her. I'll bring Little Star home.",
+					"do": [
+						"quest:lia_lamb=active",
+						"save"
+					],
+					"next": "lamb_ok"
+				}
+			]
+		},
+		"lamb_ok": {
+			"text": "She'll follow the light, she's clever! Just call her gently — she doesn't like loud people.",
+			"next": "end"
+		},
+		"lamb_back": {
+			"text": [
+				"Little Star! You came back! Oh, you're so muddy… Never mind, we'll wash you.",
+				"Grandpa lamplighter, here. It's a scarf. I was knitting it for Papa, but Papa is far away, he doesn't need it yet. And you're cold in the mountains, I know — your nose is red."
+			],
+			"do": [
+				"give:scarf",
+				"flag:scarf",
+				"quest:lia_lamb=done",
+				"save"
+			],
+			"next": "end"
+		},
+		"letter": {
+			"text": [
+				"For me? A letter — for me? Nobody has ever written to me…",
+				"\"Lia, my little sunshine. I work far beyond the mountains, under the ground, where it is dark too. They say something down there is burning and never goes out. I'll come home when the beacons are lit. Mind your mother. Papa.\"",
+				"He'll come home when the beacons are lit… Grandpa, you're lighting them, aren't you? So you're leading Papa home."
+			],
+			"do": [
+				"take:letter_lia",
+				"flag:letter_lia_done",
+				"deliver_letter"
+			],
+			"next": "end"
+		}
+	}
+}

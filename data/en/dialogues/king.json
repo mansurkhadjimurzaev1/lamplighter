@@ -1,0 +1,148 @@
+{
+	"name": "The King",
+	"news": [
+		"flag:king_met & !flag:castle_final_ready"
+	],
+	"entries": [
+		{
+			"if": "flag:castle_final_ready",
+			"node": "go"
+		},
+		{
+			"if": "flag:king_met",
+			"node": "final"
+		},
+		{
+			"if": "true",
+			"node": "first"
+		}
+	],
+	"nodes": {
+		"first": {
+			"text": [
+				"Stop. Don't come near with fire… Put it away. Put it away, do you hear?",
+				"Light brings misfortune. They told me that every day. Every day — for twenty years."
+			],
+			"choices": [
+				{
+					"text": "I didn't come to fight. I came to talk.",
+					"next": "talk"
+				},
+				{
+					"text": "Who told you that?",
+					"next": "who"
+				}
+			]
+		},
+		"who": {
+			"text": "The one who was beside me when no one else was. He left. Everyone left. Only the shades remain — and me.",
+			"next": "talk"
+		},
+		"talk": {
+			"text": [
+				"Talk… For twenty years no one has talked with me. I've forgotten how. My voice has become like an old door.",
+				"Let me gather my thoughts. Look at the walls meanwhile — everything I'm afraid to remember is painted there. Then come back."
+			],
+			"do": [
+				"flag:king_met",
+				"quest:castle=done",
+				"quest:castle_final=active",
+				"save"
+			],
+			"next": "end"
+		},
+		"final": {
+			"text": "The candle has burned down to the mark. Speak, lamplighter. Why have you come?",
+			"choices": [
+				{
+					"text": "To light the last beacon.",
+					"next": "fear"
+				},
+				{
+					"text": "To learn why you put out the light.",
+					"next": "why"
+				}
+			]
+		},
+		"why": {
+			"text": [
+				"Why… That autumn all five beacons were burning. And that autumn the queen died. The physicians couldn't help. No one could.",
+				"Morn said: fire draws misfortune from the mountains. I didn't sleep, didn't eat. I needed something to be to blame. Better the fire than me."
+			],
+			"next": "fear"
+		},
+		"fear": {
+			"text": "If you light it — misfortune will return. I couldn't bear another loss. I didn't bear this one — I just sit here and pretend to live.",
+			"choices": [
+				{
+					"text": "Misfortune didn't come from fire. Morn brought it — the smoke from his mines.",
+					"if": "flag:knows_truth",
+					"next": "truth"
+				},
+				{
+					"text": "I don't know what happened then. But I know that now people are fading in the dark.",
+					"next": "people"
+				},
+				{
+					"text": "Neither fire nor darkness will bring the queen back. But Lia has never seen the sun.",
+					"next": "lia"
+				}
+			]
+		},
+		"truth": {
+			"text": [
+				"Morn… Ansar wrote to me. I burned his letters unread. No — I read one. And answered: \"I didn't know.\" That was the truth. And a lie — because I didn't want to know.",
+				"For twenty years I guarded the darkness the way one guards the sick. And it was only smoke."
+			],
+			"next": "plea"
+		},
+		"people": {
+			"text": "People… They reported that people had locked themselves in their homes. I thought it was safer. I thought the darkness was keeping them safe. Like me.",
+			"next": "plea"
+		},
+		"lia": {
+			"text": "A girl who has never seen the sun… The queen loved mornings. She rose before everyone and opened the windows. And for twenty years I've kept them shut.",
+			"next": "plea"
+		},
+		"plea": {
+			"text": "And if you're wrong? What if fire really is misfortune?",
+			"choices": [
+				{
+					"text": "Then we'll be wrong together. Come. Let's light it, the two of us.",
+					"next": "good"
+				},
+				{
+					"text": "Very well. If it calms you — let there be darkness.",
+					"next": "bad"
+				}
+			]
+		},
+		"good": {
+			"text": [
+				"…Together. For twenty years I've done nothing together.",
+				"Very well. Give me your hand, lamplighter — my legs won't obey. The beacon is in the courtyard. I'll go first. Before I change my mind."
+			],
+			"do": [
+				"flag:castle_final_ready",
+				"king_to_beacon",
+				"save"
+			],
+			"next": "end"
+		},
+		"bad": {
+			"text": [
+				"Thank you… Thank you.",
+				"Set the lantern here, by the throne. It's quiet here. Nothing happens here. Nothing at all."
+			],
+			"do": [
+				"flag:ending_bad",
+				"ending_bad"
+			],
+			"next": "end"
+		},
+		"go": {
+			"text": "I'm at the beacon. Light it, lamplighter. I… I'm watching.",
+			"next": "end"
+		}
+	}
+}

@@ -117,11 +117,11 @@ func _add_part(m: Mesh, mat: Material, pos: Vector3, rot := Vector3.ZERO) -> Mes
 
 
 ## pivot_world — точка в руке героя; oil — уровень масла 0..1; raised — поднят ли фонарь
-func update_lantern(dt: float, pivot_world: Vector3, oil := 1.0, raised := false) -> void:
+func update_lantern(dt: float, pivot_world: Vector3, oil := 1.0, raised := false, lift_h := 0.75) -> void:
 	_t += dt
 	_raise = move_toward(_raise, 1.0 if raised else 0.0, dt * 3.5)
 	var lift := _raise * _raise * (3.0 - 2.0 * _raise)
-	pivot_world += Vector3(0, 0.75, 0) * lift
+	pivot_world += Vector3(0, lift_h, 0) * lift
 	dt = maxf(dt, 0.001)
 	var vel := (pivot_world - _last_pos) / dt if _has_last else Vector3.ZERO
 	var acc := ((vel - _last_vel) / dt).limit_length(40.0) if _has_last else Vector3.ZERO

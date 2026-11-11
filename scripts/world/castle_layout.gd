@@ -24,7 +24,7 @@ const FRESCOES := [
 ]
 const TAPESTRIES := [Vector2(-6.8, 99.0), Vector2(6.8, 99.0), Vector2(-3.0, 90.2), Vector2(3.0, 90.2)]
 const BEACON := Vector2(13.0, 98.0) # пятый маяк — во дворе на руине башни
-const NOTES := {"guard_note": Vector2(-10.0, 80.0)}
+const NOTES := {"guard_note": Vector2(-10.0, 80.0), "king_diary": Vector2(1.6, 94.6)}
 
 ## Ворота открыты (4 маяка горят)
 static var gate_open := false

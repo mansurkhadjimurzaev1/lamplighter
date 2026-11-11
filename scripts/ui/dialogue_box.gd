@@ -87,7 +87,7 @@ func _refresh() -> void:
 func _show_choices() -> void:
 	if not runner.is_last_page() or runner.choices.is_empty():
 		var touch := OS.has_feature("mobile")
-		_hint.text = "коснитесь, чтобы продолжить" if touch else "пробел / E — дальше"
+		_hint.text = Tr.t("коснитесь, чтобы продолжить") if touch else Tr.t("пробел / E — дальше")
 		return
 	_choices.visible = true
 	for i in runner.choices.size():
@@ -95,7 +95,7 @@ func _show_choices() -> void:
 		var idx := i
 		b.pressed.connect(func(): _pick(idx))
 		_choices.add_child(b)
-	_hint.text = "" if OS.has_feature("mobile") else "1–%d или мышь" % runner.choices.size()
+	_hint.text = "" if OS.has_feature("mobile") else Tr.t("1–%d или мышь") % runner.choices.size()
 
 
 func _pick(i: int) -> void:

@@ -21,9 +21,9 @@ static var hooks := {}
 
 
 static func load_data() -> void:
-	quest_data = _json("res://data/quests.json")
-	item_data = _json("res://data/items.json")
-	note_data = _json("res://data/notes.json")
+	quest_data = _json(Tr.data_path("res://data/quests.json"))
+	item_data = _json(Tr.data_path("res://data/items.json"))
+	note_data = _json(Tr.data_path("res://data/notes.json"))
 
 
 static func _json(path: String) -> Dictionary:
@@ -115,11 +115,11 @@ static func apply(a: String) -> void:
 			return
 		quests[kv[0]] = kv[1]
 		var title: String = quest_data.get(kv[0], {}).get("title", kv[0])
-		_notify("Задание выполнено: " + title if kv[1] == "done" else "Новое задание: " + title)
+		_notify(Tr.t("Задание выполнено: ") + title if kv[1] == "done" else Tr.t("Новое задание: ") + title)
 	elif a.begins_with("give:"):
 		var id := a.substr(5)
 		items[id] = int(items.get(id, 0)) + 1
-		_notify("Получено: " + item_name(id))
+		_notify(Tr.t("Получено: ") + item_name(id))
 	elif a.begins_with("take:"):
 		var id := a.substr(5)
 		var count := 1
@@ -133,7 +133,7 @@ static func apply(a: String) -> void:
 		var id := a.substr(5)
 		if not notes.has(id):
 			notes.append(id)
-			_notify("Новая запись в журнале: " + note_data.get(id, {}).get("title", id))
+			_notify(Tr.t("Новая запись в журнале: ") + note_data.get(id, {}).get("title", id))
 	elif a.begins_with("oil:"):
 		_hook("oil", float(a.substr(4)))
 	else:

@@ -1,0 +1,86 @@
+{
+	"horseshoe": {
+		"name": "An old horseshoe",
+		"trinket": true,
+		"mara": "A horseshoe… I'd hang it over the door, for luck. But luck, it seems, doesn't live in horseshoes. Well, Borta will find a use."
+	},
+	"wool": {
+		"name": "A ball of wool",
+		"trinket": true,
+		"mara": "Wool! Still warm, as if just off the sheep. I'll knit someone mittens — our winters are long."
+	},
+	"spoon": {
+		"name": "A carved spoon",
+		"trinket": true,
+		"mara": "What craftsmanship… Someone carved this for their children. I'll keep it safe — maybe the owner will come back."
+	},
+	"bead": {
+		"name": "A glass bead",
+		"trinket": true,
+		"mara": "Blue, like the sky when I was a child. Hold it to the fire — see? It glows."
+	},
+	"bread": {
+		"name": "A flatbread",
+		"trinket": false
+	},
+	"herbs": {
+		"name": "A bundle of herbs",
+		"trinket": false
+	},
+	"wire": {
+		"name": "Copper wire",
+		"trinket": false
+	},
+	"flower": {
+		"name": "A primrose from the beacon",
+		"trinket": false
+	},
+	"mushroom": {
+		"name": "A glowcap",
+		"trinket": false
+	},
+	"rope": {
+		"name": "A coil of rope",
+		"trinket": false
+	},
+	"resin": {
+		"name": "A lump of resin",
+		"trinket": false
+	},
+	"star_page": {
+		"name": "A star chart sheet",
+		"trinket": false
+	},
+	"scarf": {
+		"name": "Lia's woollen scarf",
+		"trinket": false
+	},
+	"salve": {
+		"name": "Vale's salve",
+		"trinket": false
+	},
+	"moonherb": {
+		"name": "Moonwort",
+		"trinket": false
+	},
+	"korney_bread": {
+		"name": "Bread wrapped in a cloth",
+		"trinket": false
+	},
+	"post_bag": {
+		"name": "Courier's bag",
+		"trinket": false
+	},
+	"letter_mara": {
+		"name": "A letter for Mara",
+		"trinket": false
+	},
+	"letter_borta": {
+		"name": "A letter for Borta",
+		"trinket": false
+	},
+	"letter_lia": {
+		"name": "A letter for Lia",
+		"trinket": false
+	}
+}

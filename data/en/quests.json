@@ -1,0 +1,97 @@
+{
+	"get_lantern": {
+		"title": "The Last Lantern",
+		"active": "Elder Oldrich is waiting by his house, near the square with the well.",
+		"done": "Oldrich gave me the last lantern of the Quiet Ford."
+	},
+	"light_beacon": {
+		"title": "The Beacon of the Quiet Ford",
+		"active": "The beacon stands on the hill above the village. The road starts at the square. Keep to the light.",
+		"done": "The beacon above the Ford is burning. People step onto their porches and look up."
+	},
+	"lia_sun": {
+		"title": "What Is the Sun Like?",
+		"active": "Lia has never seen the sun. She asks for even a tiny piece of light. Perhaps something near the beacon remembers the sun.",
+		"done": "I brought Lia a primrose from the beacon. She drew me her sun."
+	},
+	"mara_trade": {
+		"title": "Tea and Trade",
+		"active": "Mara at the teahouse trades found things for oil, bread and herbs. People left many things by the roads and fences.",
+		"done": "Mara and I traded. Her tea is as hot as ever."
+	},
+	"borta_lantern": {
+		"title": "A Stronger Flame",
+		"active": "Borta the smith will make the lantern a bigger tank and a sturdier cap if I bring him copper wire. Mara sometimes has copper.",
+		"done": "Borta reforged my lantern. Now it burns longer and shines wider."
+	},
+	"forest_beacon": {
+		"title": "The Beacon of the Whispering Wood",
+		"active": "Somewhere deep in the Whispering Wood a second beacon is hidden. The paths there lead in circles. Vale says the fireflies know the true way — the ones that fly, not the ones that circle.",
+		"done": "The beacon in the heart of the wood is burning. The wood remembered where its paths lead."
+	},
+	"vale_mushrooms": {
+		"title": "Glowcaps for Vale",
+		"active": "Vale the herbalist asks for three glowcaps. They glow right beside the paths, where the earth remembers light.",
+		"done": "I brought Vale three glowcaps. He'll brew a draught for those who no longer dream in the dark."
+	},
+	"swamp_beacon": {
+		"title": "The Beacon Above the Mire",
+		"active": "The third beacon stands on an islet in the middle of the Mire, beyond a deep channel. You can't reach it on foot. Beware the lights over the bog: they look like a beacon, but they are marsh gas.",
+		"done": "The beacon above the Mire is burning. The false lights have faded, and for the first time in years the water reflects the dawn."
+	},
+	"ferry_fix": {
+		"title": "The Ferryman's Boat",
+		"active": "Korney the ferryman will take me across the channel if I help with his leaking boat. He needs rope for caulking — on the old boardwalk — and resin from the dead tree by the tussocks. Be careful getting the resin: there's a bog nearby.",
+		"done": "Korney's boat floats again. He ferries me whenever I need."
+	},
+	"mountain_beacon": {
+		"title": "The Beacon Above the Observatory",
+		"active": "The fourth beacon is on a crag by the mountain observatory, in the west. The stairs wind up the slope. The cold kills the lantern: light the braziers on the way and warm yourself by the fire.",
+		"done": "The beacon on the crag is burning. A warm wind from the mountains drives the smoke away for the first time in years."
+	},
+	"ansar_pages": {
+		"title": "Ansar's Star Charts",
+		"active": "The icy wind scattered three sheets of the scholar Ansar's star charts down the stairs. He asks me to gather them — without them his records are incomplete.",
+		"done": "I returned Ansar's star charts. He told me the truth about the Pall."
+	},
+	"castle": {
+		"title": "The Castle Ruins",
+		"active": "Four beacons are burning. The portcullis on the bridge to the south has risen. In the castle ruins, in the throne hall, the king is waiting — and the last fire.",
+		"done": "I reached the throne hall."
+	},
+	"castle_final": {
+		"title": "The Last Fire",
+		"active": "The fifth beacon stands in the castle courtyard. But first I must speak with the king.",
+		"done": "—"
+	},
+	"village_lamps": {
+		"title": "The Lamps of Quiet Ford",
+		"active": "The street lamps of the Ford went out many years ago. A lamplighter knows what to do: light each one (E by the post). A lit lamp also shelters you from a wave of the Pall.",
+		"done": "All seven lamps of Quiet Ford burn again. Someone left a flask of oil on the doorstep — without a note."
+	},
+	"lia_lamb": {
+		"title": "Little Star",
+		"active": "Lia's lamb Little Star, the one with a white spot on her forehead, has run away. Lia heard her bleating somewhere to the north, by the road to the forest. Find her (E — call) and bring her back to the pen.",
+		"done": "Little Star is back in the pen. Lia gave me the scarf she was knitting for her father: \"He doesn't need it yet, and you're cold in the mountains.\""
+	},
+	"mara_bread": {
+		"title": "Bread for Korney",
+		"active": "Mara baked a flatbread for Korney the ferryman — he lives alone in the Mire and hasn't been to the Ford in years. Take it to him while it's warm.",
+		"done": "Korney held the bread for a long time, as if warming his hands. Then he gave me oil from his own store."
+	},
+	"borta_herbs": {
+		"title": "Burned Hands",
+		"active": "Borta burned his hands at the forge, but he won't say a word. Vale in the forest knows how to make a salve — he needs four stalks of moonwort. It glows with a pale blue light in open places on the island.",
+		"done": "Vale's salve helped. Borta forged a wind hood for my lantern: now a wave of the Pall barely dims the flame."
+	},
+	"post_letters": {
+		"title": "Letters Without a Courier",
+		"active": "A courier's bag lay at the foot of the mountains: the wind scattered his road long ago. Inside are three letters — for Mara, Borta and Lia. They have waited twenty years.",
+		"done": "All three letters have arrived. The courier never came back, but I finished his road."
+	},
+	"warm_road": {
+		"title": "The Warm Road",
+		"active": "Five old braziers stand along the mountain stairway. If all of them are lit, the warmth will stay in the stone.",
+		"done": "All five braziers are burning. The stone of the stairway has warmed — the cold on the mountain is not so cruel now."
+	}
+}

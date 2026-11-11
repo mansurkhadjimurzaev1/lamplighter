@@ -14,7 +14,7 @@ var choices: Array = [] # [{text, next, do}]
 
 static func load_npc(id: String) -> Dictionary:
 	if not _cache.has(id):
-		var d: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/dialogues/%s.json" % id))
+		var d: Variant = JSON.parse_string(FileAccess.get_file_as_string(Tr.data_path("res://data/dialogues/%s.json" % id)))
 		_cache[id] = d if typeof(d) == TYPE_DICTIONARY else {}
 	return _cache[id]
 
@@ -63,8 +63,8 @@ func _enter(id: String) -> void:
 		GameState.apply(a)
 	if n.has("choices_from") and n.choices_from == "trinkets":
 		for id_item in GameState.trinkets():
-			choices.append({text = "Отдать: " + GameState.item_name(id_item), next = n.get("pick_next", "end"), pick = id_item})
-		choices.append({text = "Передумал.", next = "menu" if data.nodes.has("menu") else "end"})
+			choices.append({text = Tr.t("Отдать: ") + GameState.item_name(id_item), next = n.get("pick_next", "end"), pick = id_item})
+		choices.append({text = Tr.t("Передумал."), next = "menu" if data.nodes.has("menu") else "end"})
 	else:
 		for c in n.get("choices", []):
 			if GameState.check(c.get("if", "true")):
@@ -73,7 +73,7 @@ func _enter(id: String) -> void:
 
 func _fill(t: String) -> String:
 	if "{sel_mara}" in t:
-		t = t.replace("{sel_mara}", GameState.item_data.get(GameState.sel, {}).get("mara", "Хорошая вещь."))
+		t = t.replace("{sel_mara}", GameState.item_data.get(GameState.sel, {}).get("mara", Tr.t("Хорошая вещь.")))
 	return t
 
 

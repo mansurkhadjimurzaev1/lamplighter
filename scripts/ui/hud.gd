@@ -71,8 +71,7 @@ func build() -> void:
 	_prompt.offset_bottom = -70
 	_prompt.offset_left = -200
 	_prompt.offset_right = 200
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Cormorant Garamond", "Georgia", "Times New Roman", "serif"])
+	var font := UiStyle.font()
 	_prompt.add_theme_font_override("font", font)
 	_prompt.add_theme_font_size_override("font_size", 22)
 	for st in ["font_color", "font_hover_color", "font_pressed_color"]:
@@ -101,7 +100,7 @@ func build() -> void:
 
 	if _touch:
 		var jb := Button.new()
-		jb.text = "Журнал"
+		jb.text = Tr.t("Журнал")
 		jb.focus_mode = Control.FOCUS_NONE
 		jb.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 		jb.offset_left = -130

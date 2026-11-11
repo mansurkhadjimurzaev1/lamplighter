@@ -149,6 +149,12 @@ func _draw_mini() -> void:
 				var side := Vector2(-d.y, d.x)
 				_mini_marks.draw_colored_polygon(PackedVector2Array([tip, tip - d * 10.0 + side * 6.0, tip - d * 10.0 - side * 6.0]), Color(0.55, 0.16, 0.08, 0.9))
 			continue
+		if m.kind == "goal" and not inside:
+			# главная цель далеко — ромбик-указатель на краю карты
+			var dg := (p - c).normalized()
+			var gp := c + dg * _size * 0.44
+			_mark(_mini_marks, gp, "goal", 0.8)
+			continue
 		if not inside:
 			continue
 		_mark(_mini_marks, p, m.kind, 1.0)
@@ -172,8 +178,8 @@ func _draw_full() -> void:
 	# стрелка героя: на большой карте север — вверх
 	_arrow(_full_marks, to.call(hero), 1.3, true)
 	var font := UiStyle.font(true)
-	_full_marks.draw_string(font, Vector2(16, 34), "Карта", HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color(0.45, 0.14, 0.07))
-	var hint := "коснитесь, чтобы закрыть" if OS.has_feature("mobile") else "M — закрыть"
+	_full_marks.draw_string(font, Vector2(16, 34), Tr.t("Карта"), HORIZONTAL_ALIGNMENT_LEFT, -1, 30, Color(0.45, 0.14, 0.07))
+	var hint := Tr.t("коснитесь, чтобы закрыть") if OS.has_feature("mobile") else Tr.t("M — закрыть")
 	_full_marks.draw_string(UiStyle.font(false, true), Vector2(16, _full.size.y - 16), hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.35, 0.25, 0.15))
 
 
@@ -190,6 +196,11 @@ func _mark(ci: Control, p: Vector2, kind: String, k: float) -> void:
 			# болотный огонь на карте похож на маяк — только без башни
 			ci.draw_circle(p + Vector2(0, -9) * k, 9.0 * k, Color(1.0, 0.62, 0.2, 0.35))
 			ci.draw_circle(p + Vector2(0, -9) * k, 4.0 * k, Color(1.0, 0.7, 0.3))
+		"goal":
+			var g := PackedVector2Array([p + Vector2(0, -7) * k, p + Vector2(5, 0) * k, p + Vector2(0, 7) * k, p + Vector2(-5, 0) * k])
+			ci.draw_circle(p, 10.0 * k, Color(0.85, 0.3, 0.1, 0.18))
+			ci.draw_colored_polygon(g, Color(0.75, 0.25, 0.08))
+			ci.draw_polyline(PackedVector2Array([g[0], g[1], g[2], g[3], g[0]]), Color(0.25, 0.08, 0.03), 1.2, true)
 		"npc":
 			ci.draw_circle(p, 6.0 * k, Color(1.0, 0.7, 0.3, 0.35))
 			ci.draw_circle(p, 3.0 * k, Color(0.85, 0.45, 0.12))

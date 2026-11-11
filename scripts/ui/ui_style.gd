@@ -7,19 +7,40 @@ const INK_SOFT := Color(0.38, 0.27, 0.16)
 const INK_RED := Color(0.5, 0.16, 0.08)
 const PAPER := Color(0.86, 0.78, 0.6)
 
-static var _font: SystemFont
-static var _font_bold: SystemFont
-static var _font_italic: SystemFont
+static var _font: Font
+static var _font_bold: Font
+static var _font_italic: Font
 static var _paper_tex: ImageTexture
 
 
+static var _title_font: FontFile
+
+
+## Книжный шрифт Cormorant Garamond (OFL, с кириллицей); жирность — через вариацию
 static func font(bold := false, italic := false) -> Font:
 	if _font == null:
-		var names := PackedStringArray(["Cormorant Garamond", "Georgia", "Times New Roman", "serif"])
-		_font = SystemFont.new(); _font.font_names = names
-		_font_bold = SystemFont.new(); _font_bold.font_names = names; _font_bold.font_weight = 700
-		_font_italic = SystemFont.new(); _font_italic.font_names = names; _font_italic.font_italic = true
+		var reg: FontFile = load("res://assets/fonts/CormorantGaramond.ttf")
+		var ita: FontFile = load("res://assets/fonts/CormorantGaramond-Italic.ttf")
+		var r := FontVariation.new()
+		r.base_font = reg
+		r.variation_opentype = {"wght": 500}
+		var b := FontVariation.new()
+		b.base_font = reg
+		b.variation_opentype = {"wght": 700}
+		var i := FontVariation.new()
+		i.base_font = ita
+		i.variation_opentype = {"wght": 500}
+		_font = r
+		_font_bold = b
+		_font_italic = i
 	return _font_bold if bold else (_font_italic if italic else _font)
+
+
+## Заглавный шрифт — славянская «вязь» Ruslan Display (OFL)
+static func title_font() -> Font:
+	if _title_font == null:
+		_title_font = load("res://assets/fonts/RuslanDisplay-Regular.ttf")
+	return _title_font
 
 
 ## Текстура пергамента: тёплая бумага с волокнами и потемневшими краями
@@ -87,6 +108,7 @@ static func text_button(text: String, size := 20) -> Button:
 
 
 static func clear() -> void:
+	_title_font = null
 	_font = null
 	_font_bold = null
 	_font_italic = null

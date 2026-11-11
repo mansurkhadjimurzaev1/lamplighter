@@ -7,6 +7,10 @@ var colliders: Array[Vector3] = []
 var _sheep: Array = [] # {node, anim, target, timer}
 var _rng := RandomNumberGenerator.new()
 var _lamp_lights: Array[OmniLight3D] = []
+## Фонари на столбах: {root, glass, light, lit, k (0..1 — разгорается)}
+var lamps: Array = []
+## Постройки: {m, p (локально), r (градусы), node, id}
+var houses: Array = []
 var _t := 0.0
 ## Звуки ожившей деревни (AudioStreamPlayer3D) — громкость по оживанию места
 var _emitters: Array = [] # {player, volume}
@@ -27,6 +31,7 @@ func build() -> void:
 		n.rotation.y = deg_to_rad(plot.r)
 		Props.settle(n)
 		_collide_box(n, plot.p, n.get_meta("size"), deg_to_rad(plot.r))
+		houses.append({m = plot.m, p = plot.p, r = plot.r, node = n, id = plot.get("id", "")})
 		if plot.m.begins_with("House") or plot.m == "Blacksmith" or plot.m == "Inn":
 			_chimney(n)
 	_pen()
@@ -139,10 +144,46 @@ func _lamp(local: Vector2) -> void:
 	_cyl(root, 0.06, 0.08, 2.6, Vector3(0, 1.3, 0), wood, 8)
 	_box(root, Vector3(0.6, 0.06, 0.06), Vector3(0.25, 2.5, 0), wood)
 	_box(root, Vector3(0.2, 0.04, 0.2), Vector3(0.5, 2.38, 0), iron)
-	_box(root, Vector3(0.16, 0.22, 0.16), Vector3(0.5, 2.22, 0), _glow(Color(1.0, 0.62, 0.28), 3.0))
+	var glass := _box(root, Vector3(0.16, 0.22, 0.16), Vector3(0.5, 2.22, 0), _glow(Color(1.0, 0.62, 0.28), 3.0))
 	_box(root, Vector3(0.2, 0.03, 0.2), Vector3(0.5, 2.1, 0), iron)
-	_lamp_lights.append(_light(root, Vector3(0.5, 2.1, 0), 1.3, 7.5))
+	var l := _light(root, Vector3(0.5, 2.1, 0), 1.3, 7.5)
+	_lamp_lights.append(l)
+	lamps.append({root = root, glass = glass, light = l, lit = true, k = 1.0})
 	colliders.append(Vector3(root.global_position.x, root.global_position.z, 0.25))
+
+
+## Фонарь на столбе: погашен (как все эти годы) или зажжён фонарщиком
+func set_lamp(i: int, on: bool, instant := false) -> void:
+	var lp: Dictionary = lamps[i]
+	lp.lit = on
+	if instant:
+		lp.k = 1.0 if on else 0.0
+		_apply_lamp(lp)
+	if on and not instant:
+		var fl := Fx.burst(24, 1.6)
+		lp.root.add_child(fl)
+		fl.position = Vector3(0.5, 2.2, 0)
+		fl.emitting = true
+		get_tree().create_timer(3.0).timeout.connect(fl.queue_free)
+
+
+func _apply_lamp(lp: Dictionary) -> void:
+	var g: MeshInstance3D = lp.glass
+	var m := g.material_override as StandardMaterial3D
+	if m != null:
+		if not lp.has("mat"):
+			m = m.duplicate()
+			g.material_override = m
+			lp.mat = m
+		m = lp.mat
+		m.albedo_color = Color(0.12, 0.1, 0.09).lerp(Color(1.0, 0.62, 0.28), lp.k)
+		m.emission_energy_multiplier = 3.0 * lp.k
+	(lp.light as OmniLight3D).visible = lp.k > 0.01
+
+
+## Мировая позиция фонаря (основание столба)
+func lamp_pos(i: int) -> Vector3:
+	return (lamps[i].root as Node3D).global_position
 
 
 ## Хлебная печь: глиняный купол с тлеющим жаром внутри
@@ -348,8 +389,13 @@ func _process(dt: float) -> void:
 			n.rotation.y = lerp_angle(n.rotation.y, atan2(to.x, to.y), dt * 2.0)
 		n.global_position.y = Terrain.height_at(n.global_position.x, n.global_position.z)
 	# фонари чуть дрожат
-	for i in _lamp_lights.size():
-		_lamp_lights[i].light_energy = 1.3 * (0.92 + 0.08 * sin(_t * 7.0 + i * 1.7) * sin(_t * 3.1 + i))
+	for i in lamps.size():
+		var lp: Dictionary = lamps[i]
+		var want := 1.0 if lp.lit else 0.0
+		if lp.k != want:
+			lp.k = move_toward(lp.k, want, dt * 1.2)
+			_apply_lamp(lp)
+		_lamp_lights[i].light_energy = 1.3 * lp.k * (0.92 + 0.08 * sin(_t * 7.0 + i * 1.7) * sin(_t * 3.1 + i))
 	# голоса ожившей деревни
 	for e in _emitters:
 		var p: AudioStreamPlayer3D = e.player

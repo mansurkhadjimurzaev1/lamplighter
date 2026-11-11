@@ -1,0 +1,135 @@
+{
+	"name": "Ansar the Scholar",
+	"news": [
+		"quest:ansar_pages!=active & quest:ansar_pages!=done",
+		"quest:ansar_pages=active & item:star_page>=3",
+		"quest:mountain_beacon=done & !flag:ansar_after"
+	],
+	"entries": [
+		{
+			"if": "quest:mountain_beacon=done & !flag:ansar_after",
+			"node": "after"
+		},
+		{
+			"if": "quest:ansar_pages=active & item:star_page>=3",
+			"node": "truth"
+		},
+		{
+			"if": "quest:ansar_pages=active",
+			"node": "waiting"
+		},
+		{
+			"if": "quest:ansar_pages=done",
+			"node": "later"
+		},
+		{
+			"if": "true",
+			"node": "first"
+		}
+	],
+	"nodes": {
+		"first": {
+			"text": [
+				"Don't block the… oh, block it, by all means. Nothing can be seen anyway. For twenty years nothing can be seen.",
+				"A lamplighter. Climbed the stairs, didn't freeze, didn't turn back. That's either courage or stubbornness. In science the two are often confused."
+			],
+			"choices": [
+				{
+					"text": "You still look through the telescope? Without stars?",
+					"next": "stars"
+				},
+				{
+					"text": "They say you know the truth about the Pall.",
+					"next": "truth_tease"
+				}
+			]
+		},
+		"stars": {
+			"text": "Every night. The stars can't be seen, but the smoke can: where it comes from, where it drifts, where it's thickest. A scholar looks not only at what is beautiful. A scholar looks at what is.",
+			"next": "truth_tease"
+		},
+		"truth_tease": {
+			"text": "I do. But truth without proof is just another rumour, and this kingdom has rumours enough. My star charts are the proof. And yesterday the wind flung the door open and scattered three sheets down the stairs.",
+			"next": "ask"
+		},
+		"ask": {
+			"text": "Bring them back, if it's no trouble. They're somewhere on the steps, between the braziers. You'll be going down anyway — so go down with purpose. And warm yourself on the way: the cold here isn't cruel, just hungry. It eats fire.",
+			"do": [
+				"quest:ansar_pages=active",
+				"quest:mountain_beacon=active",
+				"save"
+			],
+			"next": "end"
+		},
+		"waiting": {
+			"text": "Three sheets, on the stairs. Take your time. Sheets can wait — they're paper, they don't feel the cold.",
+			"next": "end"
+		},
+		"truth": {
+			"text": [
+				"All three. Look here: these are the mines. This is the smoke. Every year thicker — exactly as much as more silver goes to the palace.",
+				"There was a fire in the mountains. A real one, twenty years ago. But Councillor Morn's mine set a coal seam alight — and Morn doesn't put it out. He smelts silver on that fire. And the smoke rises as the Pall."
+			],
+			"choices": [
+				{
+					"text": "And the beacons?",
+					"next": "beacons"
+				},
+				{
+					"text": "And the king? Did he know?",
+					"next": "king"
+				}
+			]
+		},
+		"beacons": {
+			"text": "The ancestors built the beacons — their fire and warm wind drove smoke from the mountains. Light them all, and the smoke will go, and everyone will see the furnaces and the mines. That's why the beacons were put out. Not because light brings misfortune. Because light brings the truth.",
+			"next": "king"
+		},
+		"king": {
+			"text": [
+				"The king… The king had just buried the queen. Morn came and said: light draws misfortune. A grieving man believes whoever speaks with certainty.",
+				"I wrote to the palace. They answered me once — that there were no more stars. And then came a note without a seal: \"I didn't know. Forgive me.\" I think it was him. Himself. At night."
+			],
+			"choices": [
+				{
+					"text": "Then he can still be convinced.",
+					"next": "hope"
+				},
+				{
+					"text": "How do you forgive someone who put out the light?",
+					"next": "forgive"
+				}
+			]
+		},
+		"forgive": {
+			"text": "I don't know. Perhaps forgiving doesn't mean saying \"it was nothing\". Perhaps it means: \"it was frightening, and still I hold out my hand\". You'll decide when you see him.",
+			"next": "hope"
+		},
+		"hope": {
+			"text": "Take my journal. Everything I know is there, with numbers and dates. And light the beacon on the crag — the ridge starts behind the observatory. The last beacon is in the castle ruins. The king is waiting for you there. And his fear.",
+			"do": [
+				"take:star_page*3",
+				"quest:ansar_pages=done",
+				"note:ansar_journal",
+				"flag:knows_truth",
+				"oil:1.0",
+				"save"
+			],
+			"next": "end"
+		},
+		"later": {
+			"text": "The ridge is behind the observatory, toward the crag. Go carefully: the wind there blows away even thoughts.",
+			"next": "end"
+		},
+		"after": {
+			"text": [
+				"Do you see? No, do you SEE? The smoke is drifting east, and above the peaks… a star. Just one. The morning star. For twenty years I haven't seen a single one.",
+				"Hear the eagles? They came back first. Birds always know before scholars do. Go, lamplighter. One fire is left. The hardest — not because it's dark, but because a frightened man lives there."
+			],
+			"do": [
+				"flag:ansar_after"
+			],
+			"next": "end"
+		}
+	}
+}

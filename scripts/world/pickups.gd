@@ -125,6 +125,54 @@ func _model(n: Node3D, item: String) -> void:
 			bowl.material_override = mi.material_override
 			bowl.position = Vector3(0, 0, 0.14)
 			n.add_child(bowl)
+		"moonherb":
+			# лунная трава: тонкие стебли с бледно-голубыми огоньками
+			for k in 4:
+				var st := MeshInstance3D.new()
+				var sc := CylinderMesh.new()
+				sc.top_radius = 0.008
+				sc.bottom_radius = 0.014
+				sc.height = 0.38
+				st.mesh = sc
+				st.material_override = _mat(Color(0.3, 0.5, 0.45), 0.0, 0.5)
+				var a := k * TAU / 4.0
+				st.position = Vector3(cos(a) * 0.05, -0.05, sin(a) * 0.05)
+				st.rotation = Vector3(sin(a) * 0.25, 0, cos(a) * 0.25)
+				n.add_child(st)
+				var bud := MeshInstance3D.new()
+				var bs := SphereMesh.new()
+				bs.radius = 0.035
+				bs.height = 0.07
+				bud.mesh = bs
+				bud.material_override = _mat(Color(0.55, 0.8, 1.0), 0.0, 4.0)
+				bud.position = st.position + Vector3(sin(a) * 0.05, 0.17, cos(a) * 0.05)
+				n.add_child(bud)
+			var ml := OmniLight3D.new()
+			ml.light_color = Color(0.55, 0.8, 1.0)
+			ml.light_energy = 0.6
+			ml.omni_range = 2.5
+			ml.position.y = 0.2
+			n.add_child(ml)
+		"post_bag":
+			var bb := BoxMesh.new()
+			bb.size = Vector3(0.42, 0.3, 0.16)
+			mi.mesh = bb
+			mi.material_override = _mat(Color(0.42, 0.27, 0.15))
+			var flap := MeshInstance3D.new()
+			var fm := BoxMesh.new()
+			fm.size = Vector3(0.43, 0.04, 0.18)
+			flap.mesh = fm
+			flap.material_override = _mat(Color(0.35, 0.22, 0.12))
+			flap.position = Vector3(0, 0.16, 0)
+			n.add_child(flap)
+			var env := MeshInstance3D.new()
+			var em := BoxMesh.new()
+			em.size = Vector3(0.22, 0.02, 0.15)
+			env.mesh = em
+			env.material_override = _mat(Color(0.9, 0.85, 0.7), 0.0, 0.5)
+			env.position = Vector3(0.05, 0.19, 0.0)
+			env.rotation.z = 0.3
+			n.add_child(env)
 		"bead":
 			var s3 := SphereMesh.new()
 			s3.radius = 0.06

@@ -1,0 +1,137 @@
+{
+	"name": "Elder Oldrich",
+	"news": [
+		"!flag:has_lantern",
+		"quest:light_beacon=done & !flag:oldrich_after"
+	],
+	"entries": [
+		{
+			"if": "!flag:has_lantern",
+			"node": "first"
+		},
+		{
+			"if": "quest:light_beacon=done & !flag:oldrich_after",
+			"node": "after"
+		},
+		{
+			"if": "quest:light_beacon=done",
+			"node": "later"
+		},
+		{
+			"if": "flag:has_lantern",
+			"node": "waiting"
+		}
+	],
+	"nodes": {
+		"first": {
+			"text": [
+				"Ah, it's you. I knew you would come. Not hoped — knew. Strange, isn't it?",
+				"Do you remember the beacon on the hill above the Ford? Once its fire could be seen from every window. And its warm wind drove the smoke away."
+			],
+			"next": "first2"
+		},
+		"first2": {
+			"text": "Then came the decree: light, they said, brings misfortune. We put out the beacon. Locked our doors. And waited for the darkness to leave on its own.",
+			"choices": [
+				{
+					"text": "But it didn't leave.",
+					"next": "first3"
+				},
+				{
+					"text": "You simply obeyed the king.",
+					"next": "first3b"
+				}
+			]
+		},
+		"first3": {
+			"text": "It didn't. Darkness never leaves on its own — I understood that too late. It only teaches you to wait. And waiting without hope… that is how people turn into shades.",
+			"next": "gift"
+		},
+		"first3b": {
+			"text": "We obeyed. Obeying is easier than deciding. I was the elder — and I chose to stay silent. That is my fault, and I won't hide it.",
+			"next": "gift"
+		},
+		"gift": {
+			"text": [
+				"Here. My father kept this lantern for forty winters. The last fire left in the Ford. I want you to have it.",
+				"The beacon is on the hill, the road starts at the square. Keep to the light. The oil won't last long — be sparing."
+			],
+			"choices": [
+				{
+					"text": "I'm old, Oldrich. My legs aren't what they were.",
+					"next": "why_old"
+				},
+				{
+					"text": "Why me?",
+					"next": "why_me"
+				},
+				{
+					"text": "I will light it.",
+					"next": "promise"
+				}
+			]
+		},
+		"why_old": {
+			"text": "Patience walks slowly. But it walks the farthest. You went out every evening and lit the street lamps — twenty years, one step at a time.",
+			"next": "go"
+		},
+		"why_me": {
+			"text": "Because you alone kept going out at dusk to light the lamps — even when the decree forbade it, even when no one was left to see them. I watched from my window. I was ashamed. And warmed.",
+			"next": "go"
+		},
+		"promise": {
+			"text": "Don't promise. Just go. Promises are heavy, and you still have a lantern to carry.",
+			"next": "go"
+		},
+		"go": {
+			"text": "Shades fear fire. Raise the lantern high and they will draw back. But what they fear most is someone who doesn't give up. Look in on Mara at the teahouse — she always has a little oil. And on Borta: he is a master, though he grumbles.",
+			"do": [
+				"flag:has_lantern",
+				"quest:get_lantern=done",
+				"quest:light_beacon=active",
+				"note:oldrich_letter",
+				"save"
+			],
+			"next": "end"
+		},
+		"waiting": {
+			"text": [
+				"The beacon is waiting. It has waited a long time — it can wait a little more while you catch your breath.",
+				"If your oil runs low — go to Mara. If the lantern is weak — to Borta. And if you're afraid… then you're alive. That's good too."
+			],
+			"next": "end"
+		},
+		"after": {
+			"text": [
+				"Do you hear that? A rooster… A rooster is crowing. I'd forgotten what an awful voice they have. The most beautiful sound in the world.",
+				"Look at the people. They're standing on their doorsteps, looking up. They forgot how — and now they remember."
+			],
+			"choices": [
+				{
+					"text": "It's only the first beacon.",
+					"next": "after2"
+				},
+				{
+					"text": "I was afraid I wouldn't make it.",
+					"next": "after_fear"
+				}
+			]
+		},
+		"after_fear": {
+			"text": "And yet you did. Fear walks beside everyone who walks. It never leaves — it just falls behind, if you don't stop.",
+			"next": "after2"
+		},
+		"after2": {
+			"text": "The other beacons are farther. The nearest is in the Whispering Wood, to the north — the trail starts behind the houses. Vale the herbalist lives there; stubborn, but kind. Then the mire, the mountains. And the last one is in the castle ruins, where the king lives. Don't hurry. But don't stop.",
+			"do": [
+				"flag:oldrich_after",
+				"quest:forest_beacon=active"
+			],
+			"next": "end"
+		},
+		"later": {
+			"text": "Today two people quarrelled at the well over whose turn it was for water. They argued — and their eyes were happy. Go on, lamplighter. We'll manage here.",
+			"next": "end"
+		}
+	}
+}

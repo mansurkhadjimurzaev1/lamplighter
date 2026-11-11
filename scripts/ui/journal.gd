@@ -90,7 +90,7 @@ func _rebuild() -> void:
 	_right = _page(rrect)
 
 	# ── левая страница: задания и сумка
-	_left.add_child(UiStyle.label("Задания", 30, UiStyle.INK_RED, true))
+	_left.add_child(UiStyle.label(Tr.t("Задания"), 30, UiStyle.INK_RED, true))
 	var any := false
 	for id in GameState.quest_data:
 		var st := GameState.quest(id)
@@ -105,22 +105,22 @@ func _rebuild() -> void:
 			var q: Dictionary = GameState.quest_data[id]
 			_left.add_child(UiStyle.label("✓ " + q.title, 18, Color(UiStyle.INK_SOFT, 0.6), false, true))
 	if not any:
-		_left.add_child(UiStyle.label("Пока ничего. Ольдрих ждёт у своего дома.", 17, UiStyle.INK_SOFT, false, true))
+		_left.add_child(UiStyle.label(Tr.t("Пока ничего. Ольдрих ждёт у своего дома."), 17, UiStyle.INK_SOFT, false, true))
 	var sp := Control.new()
 	sp.custom_minimum_size = Vector2(0, 14)
 	_left.add_child(sp)
-	_left.add_child(UiStyle.label("В сумке", 24, UiStyle.INK_RED, true))
+	_left.add_child(UiStyle.label(Tr.t("В сумке"), 24, UiStyle.INK_RED, true))
 	var bag := []
 	for id in GameState.items:
 		var n := int(GameState.items[id])
 		if n > 0:
 			bag.append(GameState.item_name(id) + ("" if n == 1 else " ×%d" % n))
-	_left.add_child(UiStyle.label(", ".join(bag) if bag.size() > 0 else "Пусто.", 17, UiStyle.INK_SOFT))
+	_left.add_child(UiStyle.label(", ".join(bag) if bag.size() > 0 else Tr.t("Пусто."), 17, UiStyle.INK_SOFT))
 
 	# ── правая страница: записки
-	_right.add_child(UiStyle.label("Записки", 30, UiStyle.INK_RED, true))
+	_right.add_child(UiStyle.label(Tr.t("Записки"), 30, UiStyle.INK_RED, true))
 	if GameState.notes.is_empty():
-		_right.add_child(UiStyle.label("Пока ни одной. Фонарь освещает не только дорогу.", 17, UiStyle.INK_SOFT, false, true))
+		_right.add_child(UiStyle.label(Tr.t("Пока ни одной. Фонарь освещает не только дорогу."), 17, UiStyle.INK_SOFT, false, true))
 	for id in GameState.notes:
 		var b := UiStyle.text_button(GameState.note_data.get(id, {}).get("title", id), 19)
 		var nid: String = id
@@ -136,7 +136,7 @@ func _rebuild() -> void:
 		_right.add_child(UiStyle.label(GameState.note_data[_selected].title, 22, UiStyle.INK, true))
 		_right.add_child(UiStyle.label(GameState.note_data[_selected].text, 18, UiStyle.INK, false, true))
 
-	var close_b := UiStyle.text_button("Закрыть  (J)", 16)
+	var close_b := UiStyle.text_button(Tr.t("Закрыть  (J)"), 16)
 	close_b.position = origin + Vector2(w - 160, h + 8)
 	close_b.add_theme_color_override("font_color", Color(0.95, 0.85, 0.65))
 	close_b.pressed.connect(close)
