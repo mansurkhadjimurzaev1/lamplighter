@@ -74,6 +74,8 @@ var _rumble: AudioStreamPlayer
 var _guide_t := 0.0
 var _veil_vis := 0.0
 var _ash: GPUParticles3D
+var ambience: Ambience
+var _moths: GPUParticles3D
 var _exposure := 0.0
 var _menu_spot := Vector3.ZERO
 var _menu_fire: Node3D
@@ -374,6 +376,9 @@ func _build_world() -> void:
 	region_audio = RegionAudio.new()
 	region_audio.build()
 	add_child(region_audio)
+	ambience = Ambience.new()
+	add_child(ambience)
+	ambience.build()
 	for bb in beacons:
 		bb.sound = sound
 	if not Args.has("skip_vsound"):
@@ -402,6 +407,8 @@ func _build_world() -> void:
 	goal_hud.cam = cam
 	_ash = _make_ash()
 	add_child(_ash)
+	_moths = _make_moths()
+	lantern.add_child(_moths)
 	_rumble = AudioStreamPlayer.new()
 	_rumble.stream = Synth.cached("veil_rumble", func(): return Synth.filter(Synth.noise(12.0, true), "lp", 140.0, 0.7), true)
 	_rumble.volume_db = -80.0
@@ -1010,6 +1017,21 @@ func _process(dt: float) -> void:
 	var mlife := 0.0
 	if beacons[3].lit:
 		mlife = 1.0 - Terrain.ss(beacons[3].radius - 6.0, beacons[3].radius, Vector2(hp.x - beacons[3].position.x, hp.z - beacons[3].position.z).length())
+	# голоса ночи вокруг героя
+	ambience.island = 1.0 - maxf(maxf(_forest_f, _swamp_f), maxf(_mtn_f, _castle_f))
+	ambience.forest = _forest_f
+	ambience.swamp = _swamp_f
+	ambience.mountains = _mtn_f
+	ambience.castle = _castle_f
+	ambience.inside = 1.0 if inside else 0.0
+	ambience.alive = life
+	var sn := 99.0
+	for sh in shades.list_all() + castle_shades.list_all():
+		if sh.visible:
+			sn = minf(sn, sh.global_position.distance_to(hp))
+	ambience.shade_near = sn
+	ambience.update(dt, hp, hero.distance, has_lantern, playing)
+	_moths.emitting = has_lantern and not inside and _veil_vis < 0.5 and Quality.level != "low"
 	region_audio.update_layers(dt, {"village": vlife * (1.0 - _forest_f) * (1.0 - _swamp_f) * (1.0 - _mtn_f), "forest": flife, "swamp": slife, "mountains": mlife})
 	_mtn_f = lerpf(_mtn_f, 0.0 if inside else MountainLayout.region_factor(hp.x, hp.z), 1.0 - exp(-dt * 0.8))
 	mountains.update_mountains(dt, hp, _mtn_f, mlife)
@@ -1535,6 +1557,59 @@ func _on_veil_event(ev: String) -> void:
 			hud.toast(Tr.t("Пелена отступила."))
 
 
+## Мошки и пылинки, кружащие у фонаря — видны в его свете
+func _make_moths() -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.amount = 14
+	p.lifetime = 3.5
+	p.local_coords = true
+	p.preprocess = 2.0
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	pm.emission_sphere_radius = 0.55
+	pm.gravity = Vector3.ZERO
+	pm.initial_velocity_min = 0.05
+	pm.initial_velocity_max = 0.25
+	pm.spread = 180.0
+	pm.turbulence_enabled = true
+	pm.turbulence_noise_strength = 2.5
+	pm.turbulence_noise_scale = 1.5
+	pm.turbulence_influence_min = 0.15
+	pm.turbulence_influence_max = 0.35
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1, 1, 1, 0))
+	fade.add_point(0.2, Color(1, 1, 1, 1))
+	fade.add_point(0.8, Color(1, 1, 1, 1))
+	fade.set_color(fade.get_point_count() - 1, Color(1, 1, 1, 0))
+	var gt := GradientTexture1D.new()
+	gt.gradient = fade
+	pm.color_ramp = gt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(0.022, 0.022)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.albedo_color = Color(1.0, 0.85, 0.6, 0.8)
+	var dot := GradientTexture2D.new()
+	dot.fill = GradientTexture2D.FILL_RADIAL
+	dot.fill_from = Vector2(0.5, 0.5)
+	dot.fill_to = Vector2(1.0, 0.5)
+	var dg := Gradient.new()
+	dg.set_color(0, Color(1, 1, 1, 1))
+	dg.set_color(1, Color(1, 1, 1, 0))
+	dot.gradient = dg
+	dot.width = 32
+	dot.height = 32
+	m.albedo_texture = dot
+	q.material = m
+	p.draw_pass_1 = q
+	p.position = Vector3(0, -0.1, 0)
+	return p
+
+
 ## Пепел, который несёт волна Пелены (летит вокруг героя)
 func _make_ash() -> GPUParticles3D:
 	var p := GPUParticles3D.new()
@@ -1562,6 +1637,17 @@ func _make_ash() -> GPUParticles3D:
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
 	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	m.albedo_color = Color(0.62, 0.57, 0.53, 0.6)
+	var dot := GradientTexture2D.new()
+	dot.fill = GradientTexture2D.FILL_RADIAL
+	dot.fill_from = Vector2(0.5, 0.5)
+	dot.fill_to = Vector2(1.0, 0.5)
+	dot.width = 32
+	dot.height = 32
+	var dg := Gradient.new()
+	dg.set_color(0, Color(1, 1, 1, 1))
+	dg.set_color(1, Color(1, 1, 1, 0))
+	dot.gradient = dg
+	m.albedo_texture = dot
 	q.material = m
 	p.draw_pass_1 = q
 	p.emitting = false
@@ -1984,8 +2070,39 @@ func _menu_look() -> void:
 
 func _autotest(dir: String) -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
+	Settings.first_person = Args.has("fp") # проверки — с обычной камерой, если не попросили иначе
 	await _wait(0.5)
 	title.start()
+	if Args.has("pinelook"):
+		GameState.flags["has_lantern"] = true
+		var c := VillageLayout.world(Vector2(-1.5, 4.5))
+		print("pine spot ", c)
+		var base := _ground3(c)
+		var model := Pine.make(1037, load("res://assets/textures/ground/Rock030_color.jpg"))
+		for part in model.parts:
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_custom_data = true
+			mm.mesh = part.mesh
+			mm.instance_count = 1
+			mm.set_instance_transform(0, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 8.0), base))
+			mm.set_instance_custom_data(0, Color(base.y, 8.0, 0.5, 0.0))
+			var mmi := MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			add_child(mmi)
+		var views := [["fp-near", 1.6, 5.0, true], ["fp-mid", 5.5, 14.0, true], ["tp", 3.0, 0.0, false]]
+		for v in views:
+			Settings.first_person = v[3]
+			hero.global_position = _ground3(c - Vector2(0, v[1]))
+			cam.look_yaw = PI
+			cam.look_pitch = deg_to_rad(v[2])
+			cam.snap(hero.global_position)
+			Input.action_press("raise")
+			await _wait(2.0)
+			await _shot(dir, "pine-%s.png" % v[0])
+			Input.action_release("raise")
+		get_tree().quit()
+		return
 	if Args.has("doorlook"):
 		Settings.first_person = true
 		for r in interiors.rooms:
@@ -2557,10 +2674,24 @@ func _autotest(dir: String) -> void:
 		await _wait(1.5)
 		GameState.flags["has_lantern"] = true
 		cam.zoom = 0.55
+		for v in npcs:
+			var sk: Skeleton3D = v.find_children("*", "Skeleton3D", true, false)[0]
+			print(v.id, " head scale=", sk.get_bone_pose_scale(sk.find_bone("head")), " global=", sk.get_bone_global_pose(sk.find_bone("head")).basis.get_scale())
 		for id in ["oldrich", "borta", "lia", "mara"]:
 			_goto_local(VillageLayout.NPC_SPOTS[id] + Vector2(1.3, 1.1))
 			await _wait(2.0)
 			await _shot(dir, "npc-%s.png" % id)
+			if Args.has("fpnpc"):
+				Settings.first_person = true
+				var w := VillageLayout.world(VillageLayout.NPC_SPOTS[id])
+				hero.global_position = _ground3(w + Vector2(0, 2.2))
+				cam.look_yaw = 0.0
+				cam.look_pitch = deg_to_rad(-8.0)
+				Input.action_press("raise")
+				await _wait(1.5)
+				await _shot(dir, "npc-%s-fp.png" % id)
+				Input.action_release("raise")
+				Settings.first_person = false
 		get_tree().quit()
 		return
 	if Args.has("storytest"):

@@ -52,7 +52,9 @@ func build() -> void:
 				sm.roughness = 0.85
 				sm.metallic = 0.0
 				sm.albedo_color = Color(0.62, 0.58, 0.5) # приглушаем яркую зелень — дорожный, выцветший плащ
+	var lift := Proportions.apply(model)
 	model.scale = Vector3.ONE * (HERO_HEIGHT / maxf(box.size.y, 0.01))
+	model.position.y += lift * model.scale.y
 
 	var sk := model.find_children("*", "Skeleton3D", true, false)
 	if sk.size() > 0:

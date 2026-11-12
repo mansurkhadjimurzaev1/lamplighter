@@ -13,6 +13,8 @@ varying float tip;
 varying vec3 tint;
 varying float rs;
 varying float edge;
+varying float side;
+varying float dry;
 
 void vertex() {
 	vec3 root = MODEL_MATRIX[3].xyz; // основание травинки в мире
@@ -53,10 +55,21 @@ void vertex() {
 	night = mix(vec3(dot(night, vec3(0.33))), night, 0.7);
 	vec3 alive = mix(vec3(0.16, 0.42, 0.06), vec3(0.08, 0.36, 0.08), hue);
 	tint = mix(night, alive, rs) * mix(0.8, 1.25, hash12(root.xz * 7.7));
+	// изредка — сухие соломенные травинки
+	dry = step(0.9, hash12(root.xz * 5.3));
+	side = UV.x;
 }
 
 void fragment() {
-	ALBEDO = tint * mix(0.5, 1.0, tip);
+	vec3 straw = vec3(0.32, 0.27, 0.13) * (0.7 + 0.6 * rs);
+	vec3 c = mix(tint, straw, dry * 0.8);
+	// у корня темно, к кончику светлее и чуть желтее
+	c *= mix(0.35, 1.0, smoothstep(0.0, 0.7, tip));
+	c = mix(c, c * vec3(1.15, 1.12, 0.8), smoothstep(0.7, 1.0, tip) * 0.6);
+	// середина травинки (жилка) чуть светлее краёв
+	c *= 0.85 + 0.3 * (1.0 - abs(side - 0.5) * 2.0);
+	ALBEDO = c;
+	BACKLIGHT = c * 0.6;
 	EMISSION = vec3(1.0, 0.7, 0.3) * edge * tip * 0.8;
 	ROUGHNESS = 0.9;
 	SPECULAR = 0.2;

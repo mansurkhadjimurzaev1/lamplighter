@@ -73,6 +73,10 @@ func _kinds() -> Array:
 
 ## Разбираем модель на меши с их положением; нормализуем: высота 1, основание на y = 0
 func _load_model(file: String, grow := false) -> Dictionary:
+	if file.begins_with("PineTree_") and not Args.has("oldpines"):
+		if _rock_tex == null:
+			_rock_tex = load("res://assets/textures/ground/Rock030_color.jpg")
+		return Pine.make(1000 + int(file.get_slice("_", 1)) * 37, _rock_tex)
 	var scene: PackedScene = load(BASE + file + ".glb")
 	var root := scene.instantiate()
 	var parts: Array = []
@@ -208,7 +212,12 @@ func build(cast_shadows: bool) -> void:
 					mm.set_instance_custom_data(i, it[1])
 				var mmi := MultiMeshInstance3D.new()
 				mmi.multimesh = mm
-				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and kind.shadow) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and kind.shadow and part.get("shadow", true)) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				if part.has("range"):
+					var rg: Vector2 = part.range
+					mmi.visibility_range_begin = rg.x
+					if rg.y > 0.0:
+						mmi.visibility_range_end = rg.y
 				add_child(mmi)
 
 
@@ -403,8 +412,13 @@ func build_forest(cast_shadows: bool) -> void:
 					mm.set_instance_custom_data(i, bucket.items[i][1])
 				var mmi := MultiMeshInstance3D.new()
 				mmi.multimesh = mm
-				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and bucket.casts) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and bucket.casts and part.get("shadow", true)) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				mmi.visibility_range_end = 70.0
+				if part.has("range"):
+					var rg: Vector2 = part.range
+					mmi.visibility_range_begin = rg.x
+					if rg.y > 0.0:
+						mmi.visibility_range_end = rg.y
 				add_child(mmi)
 
 
@@ -482,8 +496,13 @@ func build_swamp(cast_shadows: bool) -> void:
 					mm.set_instance_custom_data(i, bucket.items[i][1])
 				var mmi := MultiMeshInstance3D.new()
 				mmi.multimesh = mm
-				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and kind.shadow) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if (cast_shadows and kind.shadow and part.get("shadow", true)) else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				mmi.visibility_range_end = 70.0
+				if part.has("range"):
+					var rg: Vector2 = part.range
+					mmi.visibility_range_begin = rg.x
+					if rg.y > 0.0:
+						mmi.visibility_range_end = rg.y
 				add_child(mmi)
 	# цветы кувшинок: распускаются после маяка (grow)
 	var flower := _flower_mesh(Color(0.98, 0.78, 0.86))

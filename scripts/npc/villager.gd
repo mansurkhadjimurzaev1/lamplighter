@@ -47,8 +47,11 @@ func build(cfg: Dictionary) -> void:
 					mats[src] = _tinted((src as StandardMaterial3D).albedo_texture, cfg.get("swaps", []))
 				mi.set_surface_override_material(i, mats[src])
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var lift := Proportions.apply(model) if not cfg.get("chibi", false) else 0.0
 	var s: float = cfg.get("height", 1.5) / maxf(box.size.y, 0.01)
 	model.scale = Vector3.ONE * s
+	if not str(cfg.get("pose", "")).begins_with("Sit"):
+		model.position.y += lift * s
 	_head_h = box.size.y * s
 
 	if cfg.has("scarf") and head_mi != null:

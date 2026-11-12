@@ -7,6 +7,15 @@ const CHUNK := 10.0
 
 
 func build(per_m2: float) -> void:
+	_layer(per_m2, 48.0, 99)
+	# рядом с камерой — ещё один слой тонких травинок: вблизи (от первого лица) трава густая
+	if Quality.level == "high":
+		_layer(per_m2 * 1.6, 13.0, 177)
+	elif Quality.level == "medium":
+		_layer(per_m2 * 1.0, 11.0, 177)
+
+
+func _layer(per_m2: float, view: float, seed_value: int) -> void:
 	var blade := _blade_mesh()
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -14,11 +23,12 @@ func build(per_m2: float) -> void:
 	var count := int(CHUNK * CHUNK * per_m2)
 	mm.instance_count = count
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 99
+	rng.seed = seed_value
 	for i in count:
 		var b := Basis(Vector3.UP, rng.randf() * TAU)
 		b = b.rotated(Vector3.RIGHT, rng.randf_range(-0.12, 0.12))
-		b = b.scaled(Vector3(rng.randf_range(0.8, 1.4), rng.randf_range(0.18, 0.46), 1.0))
+		var tall := rng.randf_range(0.16, 0.42) * (1.6 if rng.randf() < 0.12 else 1.0)
+		b = b.scaled(Vector3(rng.randf_range(0.7, 1.3), tall, 1.0))
 		mm.set_instance_transform(i, Transform3D(b, Vector3(rng.randf() * CHUNK, 0.0, rng.randf() * CHUNK)))
 	# вершины сдвигаются в шейдере по высоте — расширяем рамку видимости
 	mm.custom_aabb = AABB(Vector3(-1, -4, -1), Vector3(CHUNK + 2, 14, CHUNK + 2))
@@ -38,7 +48,8 @@ func build(per_m2: float) -> void:
 				mmi.material_override = mat
 				mmi.position = Vector3(x, 0, z)
 				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				mmi.visibility_range_end = 48.0
+				mmi.visibility_range_end = view
+				mmi.visibility_range_end_margin = 3.0
 				add_child(mmi)
 			z += CHUNK
 		x += CHUNK
@@ -54,13 +65,13 @@ func _has_land(x: float, z: float) -> bool:
 
 ## Травинка из 3 сегментов, сужается к кончику, слегка изогнута
 func _blade_mesh() -> ArrayMesh:
-	var segs := 3
+	var segs := 4
 	var verts := PackedVector3Array()
 	var uvs := PackedVector2Array()
 	for i in segs + 1:
 		var t := float(i) / segs
-		var w := 0.042 * (1.0 - t * 0.9)
-		var bend := t * t * 0.12
+		var w := 0.024 * (1.0 - t * 0.92)
+		var bend := t * t * 0.16
 		if i < segs:
 			verts.append(Vector3(-w, t, bend)); uvs.append(Vector2(0, t))
 			verts.append(Vector3(w, t, bend)); uvs.append(Vector2(1, t))
